@@ -5,6 +5,6 @@ class Settings(BaseSettings):
 
     openai_api_key: str
     openai_model: str = "gpt-4.1-mini"
-    kb_path: str = "./kb/example.yaml"
+    kb_path: str = "./kb/subjects.yaml"
 
 settings = Settings()
