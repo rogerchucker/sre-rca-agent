@@ -1,4 +1,4 @@
-from core.orchestrator import normalize_incident, seed_alert_evidence, score_and_report, _shift_rfc3339
+from core.orchestrator import normalize_incident, seed_alert_evidence, score_and_report, summarize_evidence, _shift_rfc3339
 from core.models import EvidenceItem, TimeRange
 
 
@@ -58,6 +58,9 @@ def test_score_and_report_fallback():
     report = out["report"]
     assert "Insufficient evidence" in report["top_hypothesis"]["statement"]
     assert report["top_hypothesis"]["confidence"] == 0.0
+    assert "what_changed" in report
+    assert "impact_scope" in report
+    assert "fallback_hypotheses" in report
 
 
 def test_normalize_incident_skips_when_present():
@@ -150,11 +153,18 @@ def test_score_and_report_stops_when_confident():
             "annotations": {},
             "raw": {},
         },
+        "kb_slice": {
+            "subject_cfg": {
+                "known_failure_modes": [
+                    {"name": "deploy_regression", "indicators": ["deploy related regression"]}
+                ]
+            }
+        },
         "evidence": [e.model_dump() for e in evidence],
         "hypotheses": [
             {
                 "id": "h1",
-                "statement": "This is a sufficiently long hypothesis statement to score specificity well.",
+                "statement": "This is a sufficiently long hypothesis statement about deploy related regression.",
                 "confidence": 0.0,
                 "score_breakdown": {},
                 "supporting_evidence_ids": ["e_logs", "e_deploy", "e_change"],
@@ -168,3 +178,30 @@ def test_score_and_report_stops_when_confident():
     out = score_and_report(state)
     assert out["should_iterate"] is False
     assert out["iteration"] == 1
+
+
+def test_summarize_evidence_adds_kb_items():
+    state = {
+        "incident": {
+            "title": "t",
+            "severity": "s",
+            "environment": "prod",
+            "subject": "payments",
+            "time_range": {"start": "2024-01-01T12:00:00Z", "end": "2024-01-01T12:10:00Z"},
+            "labels": {},
+            "annotations": {},
+            "raw": {},
+        },
+        "kb_slice": {
+            "subject_cfg": {
+                "dependencies": [{"name": "postgres", "role": "primary"}],
+                "runbooks": [{"title": "DB pool troubleshooting", "link": "https://example.invalid"}],
+            }
+        },
+        "evidence": [],
+    }
+
+    out = summarize_evidence(state)
+    kinds = {e["kind"] for e in out["evidence"]}
+    assert "service_graph" in kinds
+    assert "runbook" in kinds

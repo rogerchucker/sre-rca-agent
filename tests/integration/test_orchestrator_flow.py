@@ -82,13 +82,37 @@ class FakeChat:
         self._content = content
 
     def create(self, **kwargs):
+        tools = kwargs.get("tools") or []
+        tool_names = {t.get("function", {}).get("name") for t in tools}
+
         class Choice:
-            def __init__(self, content):
+            def __init__(self, content, tool_calls):
                 class Msg:
-                    def __init__(self, content):
+                    def __init__(self, content, tool_calls):
                         self.content = content
-                self.message = Msg(content)
-        return type("Resp", (), {"choices": [Choice(self._content)]})
+                        self.tool_calls = tool_calls
+                self.message = Msg(content, tool_calls)
+
+        if "emit_hypotheses" in tool_names:
+            tool_calls = [
+                type(
+                    "ToolCall",
+                    (),
+                    {
+                        "function": type(
+                            "Fn",
+                            (),
+                            {
+                                "name": "emit_hypotheses",
+                                "arguments": self._content,
+                            },
+                        )()
+                    },
+                )()
+            ]
+            return type("Resp", (), {"choices": [Choice("", tool_calls)]})
+
+        return type("Resp", (), {"choices": [Choice(self._content, [])]})
 
 
 class FakeClient:

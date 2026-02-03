@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from openai import OpenAI
 from core.config import settings
@@ -15,8 +16,10 @@ from core.models import (
 )
 from core.prompts import SYSTEM_PROMPT, HYPOTHESIS_TASK, PLAN_TASK, EVIDENCE_TOOL_SYSTEM
 from core.scoring import rank
+from core.tracing import get_tracer
 
 client = OpenAI(api_key=settings.openai_api_key)
+TRACER = get_tracer(settings.trace_file)
 
 CONFIDENCE_THRESHOLD = 0.62
 MAX_ITERATIONS = 2
@@ -39,6 +42,7 @@ def build_graph():
 
     g.add_node("plan_evidence", plan_evidence)
     g.add_node("collect_evidence_tools", collect_evidence_tools)
+    g.add_node("summarize_evidence", summarize_evidence)
 
     g.add_node("hypothesize", hypothesize)
     g.add_node("score_and_report", score_and_report)
@@ -49,11 +53,13 @@ def build_graph():
 
     g.add_edge("seed_alert_evidence", "plan_evidence")
     g.add_edge("plan_evidence", "collect_evidence_tools")
-    g.add_edge("collect_evidence_tools", "hypothesize")
+    g.add_edge("collect_evidence_tools", "summarize_evidence")
+    g.add_edge("summarize_evidence", "hypothesize")
     g.add_edge("hypothesize", "score_and_report")
     g.add_conditional_edges("score_and_report", decide_next, {"iterate": "plan_evidence", "end": END})
 
-    return g.compile()
+    checkpointer = MemorySaver() if settings.enable_persistence else None
+    return g.compile(checkpointer=checkpointer)
 
 # ---- Nodes (core-neutral) ----
 
@@ -97,6 +103,7 @@ def normalize_incident(state: Dict[str, Any]) -> Dict[str, Any]:
         raw=raw,
     )
     state["incident"] = incident.model_dump()
+    TRACER.emit({"event": "normalize_incident", "subject": incident.subject, "environment": incident.environment})
     return state
 
 def load_kb_slice(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -175,6 +182,7 @@ def plan_evidence(state: Dict[str, Any]) -> Dict[str, Any]:
         actions = _fallback_plan(available_tools, missing)
 
     state["plan"] = actions
+    TRACER.emit({"event": "plan_evidence", "actions": [a.get("tool") for a in actions]})
     return state
 
 def collect_evidence_tools(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -226,6 +234,17 @@ def collect_evidence_tools(state: Dict[str, Any]) -> Dict[str, Any]:
     evidence = _maybe_fetch_deploy_metadata(evidence, subject_cfg, registry)
     evidence = _maybe_fetch_build_metadata(evidence, subject_cfg, registry)
     state["evidence"] = [e.model_dump() for e in evidence]
+    TRACER.emit({"event": "collect_evidence", "count": len(evidence)})
+    return state
+
+def summarize_evidence(state: Dict[str, Any]) -> Dict[str, Any]:
+    incident = IncidentInput(**state["incident"])
+    subject_cfg = state["kb_slice"]["subject_cfg"]
+    evidence = [EvidenceItem(**x) for x in state.get("evidence", [])]
+
+    evidence = _add_kb_evidence_items(evidence, subject_cfg, incident.time_range)
+    state["evidence"] = [e.model_dump() for e in evidence]
+    TRACER.emit({"event": "summarize_evidence", "count": len(evidence)})
     return state
 
 def hypothesize(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -246,20 +265,59 @@ def hypothesize(state: Dict[str, Any]) -> Dict[str, Any]:
         "task": HYPOTHESIS_TASK,
     }
 
+    tools = [{
+        "type": "function",
+        "function": {
+            "name": "emit_hypotheses",
+            "description": "Return hypotheses as structured output.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "hypotheses": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "id": {"type": "string"},
+                                "statement": {"type": "string"},
+                                "supporting_evidence_ids": {"type": "array", "items": {"type": "string"}},
+                                "contradictions": {"type": "array", "items": {"type": "string"}},
+                                "validations": {"type": "array", "items": {"type": "string"}},
+                            },
+                            "required": ["id", "statement", "supporting_evidence_ids", "contradictions", "validations"],
+                        },
+                    }
+                },
+                "required": ["hypotheses"],
+            },
+        },
+    }]
+
     resp = client.chat.completions.create(
         model=settings.openai_model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": json.dumps(payload)},
         ],
+        tools=tools,
+        tool_choice="required",
+        parallel_tool_calls=False,
         temperature=0.2,
     )
 
-    text = resp.choices[0].message.content or "{}"
-    try:
-        parsed = json.loads(text)
-    except Exception:
-        parsed = {"hypotheses": []}
+    msg = resp.choices[0].message
+    parsed = None
+    tool_calls = getattr(msg, "tool_calls", None) or []
+    for call in tool_calls:
+        if call.function.name == "emit_hypotheses":
+            parsed = _safe_json(call.function.arguments or "{}")
+            break
+    if parsed is None:
+        text = msg.content or "{}"
+        parsed = _safe_json(text) or {"hypotheses": []}
 
     hyps: List[Hypothesis] = []
     for i, h in enumerate(parsed.get("hypotheses", [])[:5]):
@@ -274,6 +332,7 @@ def hypothesize(state: Dict[str, Any]) -> Dict[str, Any]:
         ))
 
     state["hypotheses"] = [h.model_dump() for h in hyps]
+    TRACER.emit({"event": "hypothesize", "count": len(hyps)})
     return state
 
 def score_and_report(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -281,7 +340,7 @@ def score_and_report(state: Dict[str, Any]) -> Dict[str, Any]:
     evidence = [EvidenceItem(**x) for x in state.get("evidence", [])]
     hyps = [Hypothesis(**x) for x in state.get("hypotheses", [])]
 
-    ranked = rank(hyps, evidence)
+    ranked = rank(hyps, evidence, incident.time_range, state.get("kb_slice"))
     if ranked:
         top = ranked[0]
         others = ranked[1:]
@@ -304,7 +363,10 @@ def score_and_report(state: Dict[str, Any]) -> Dict[str, Any]:
         time_range=incident.time_range,
         top_hypothesis=top,
         other_hypotheses=others,
+        fallback_hypotheses=others[:3],
         evidence=evidence,
+        what_changed=_derive_what_changed(evidence),
+        impact_scope=_derive_impact_scope(evidence),
         next_validations=next_validations,
     )
     state["report"] = report.model_dump()
@@ -313,6 +375,7 @@ def score_and_report(state: Dict[str, Any]) -> Dict[str, Any]:
     state["should_iterate"] = should_iterate
     if should_iterate:
         state["iteration"] = iteration + 1
+    TRACER.emit({"event": "score_and_report", "confidence": top.confidence, "iterate": should_iterate})
     return state
 
 def decide_next(state: Dict[str, Any]) -> str:
@@ -331,12 +394,51 @@ def _compact_evidence(evidence: List[EvidenceItem]) -> List[Dict[str, Any]]:
         })
     return compact
 
+def _add_kb_evidence_items(evidence: List[EvidenceItem], subject_cfg: Dict[str, Any], tr: TimeRange) -> List[EvidenceItem]:
+    # Service graph evidence (dependencies)
+    deps = subject_cfg.get("dependencies", [])
+    if deps and not any(e.kind == "service_graph" for e in evidence):
+        evidence.append(EvidenceItem(
+            id=_evidence_id("service_graph", str(deps)),
+            kind="service_graph",
+            source="knowledge_base",
+            time_range=tr,
+            query="kb.dependencies",
+            summary="Service dependency graph from the knowledge base.",
+            samples=[],
+            top_signals={"dependencies": deps},
+            pointers=[],
+            tags=["kb", "service_graph"],
+        ))
+
+    runbooks = subject_cfg.get("runbooks", [])
+    if runbooks and not any(e.kind == "runbook" for e in evidence):
+        evidence.append(EvidenceItem(
+            id=_evidence_id("runbook", str(runbooks)),
+            kind="runbook",
+            source="knowledge_base",
+            time_range=tr,
+            query="kb.runbooks",
+            summary="Runbooks associated with the subject from the knowledge base.",
+            samples=[],
+            top_signals={"runbooks": runbooks},
+            pointers=[],
+            tags=["kb", "runbook"],
+        ))
+
+    return evidence
+
 def _safe_json(text: str) -> Dict[str, Any]:
     try:
         parsed = json.loads(text)
         return parsed if isinstance(parsed, dict) else {}
     except Exception:
         return {}
+
+def _evidence_id(prefix: str, content: str) -> str:
+    import hashlib
+    h = hashlib.sha1(content.encode("utf-8")).hexdigest()[:10]
+    return f"{prefix}_{h}"
 
 def _available_tools(subject_cfg: Dict[str, Any]) -> List[str]:
     tools: List[str] = []
@@ -796,15 +898,50 @@ def _call_query_traces(args: Dict[str, Any], incident: IncidentInput, subject_cf
     )
     return trace_provider.search_traces(req)
 
+def _derive_what_changed(evidence: List[EvidenceItem]) -> Dict[str, Any]:
+    deploys = []
+    builds = []
+    changes = []
+    for e in evidence:
+        if e.kind == "deploy":
+            deploys.append(e.top_signals)
+        elif e.kind == "build":
+            builds.append(e.top_signals)
+        elif e.kind == "change":
+            changes.append(e.top_signals)
+    return {
+        "deployments": deploys,
+        "builds": builds,
+        "changes": changes,
+    }
+
+def _derive_impact_scope(evidence: List[EvidenceItem]) -> Dict[str, Any]:
+    impact: Dict[str, Any] = {"error_signatures": [], "event_reasons": [], "trace_ids": []}
+    for e in evidence:
+        if e.kind == "logs":
+            sigs = (e.top_signals or {}).get("signatures") or []
+            impact["error_signatures"].extend(sigs)
+        if e.kind == "event":
+            reasons = (e.top_signals or {}).get("reasons") or {}
+            impact["event_reasons"].append(reasons)
+        if e.kind == "trace":
+            trace_ids = (e.top_signals or {}).get("trace_ids") or []
+            impact["trace_ids"].extend(trace_ids)
+    return impact
+
 
 GRAPH = build_graph()
 
 def run(webhook_payload: dict) -> dict:
     state = {"raw_webhook": webhook_payload}
+    TRACER.emit({"event": "run_start"})
     out = GRAPH.invoke(state)
+    TRACER.emit({"event": "run_end"})
     return out.get("report", out)
 
 def run_incident(incident: IncidentInput) -> dict:
     state = {"incident": incident.model_dump()}
+    TRACER.emit({"event": "run_start"})
     out = GRAPH.invoke(state)
+    TRACER.emit({"event": "run_end"})
     return out.get("report", out)

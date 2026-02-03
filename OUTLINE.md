@@ -125,6 +125,10 @@ Tools you expose to the model (examples)
 Important design choice
 	•	Make tools purely read-only and bounded (time range + limit + sampling).
 
+Tracing/Persistence (optional)
+	•	Enable in-memory graph persistence with `ENABLE_PERSISTENCE=true`.
+	•	Emit JSONL trace events by setting `TRACE_FILE=/path/to/trace.jsonl`.
+
 ## 7. Hypothesis ranking: Use hybrid scoring
 
 Use deterministic scoring to makes demos (and real-world reviews) much more credible.

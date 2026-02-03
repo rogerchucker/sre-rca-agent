@@ -33,8 +33,18 @@ def test_score_hypothesis_coverage_and_contradictions():
         validations=[],
     )
 
-    breakdown = score_hypothesis(h, evidence)
-    assert breakdown["coverage"] == 1.0
+    tr = TimeRange(start="2024-01-01T00:00:00Z", end="2024-01-01T00:10:00Z")
+    kb_slice = {
+        "subject_cfg": {
+            "known_failure_modes": [
+                {"name": "deploy_regression", "indicators": ["deploy related regression"]}
+            ]
+        }
+    }
+    breakdown = score_hypothesis(h, evidence, tr, kb_slice)
+    assert breakdown["coverage"] == 0.75
+    assert breakdown["temporal_alignment"] == 1.0
+    assert breakdown["kb_match"] == 1.0
     assert breakdown["deploy_signal"] == 0.8
     assert breakdown["contradiction_penalty"] > 0.0
 
@@ -60,5 +70,6 @@ def test_rank_sorts_by_confidence():
         validations=[],
     )
 
-    ranked = rank([h1, h2], evidence)
+    tr = TimeRange(start="2024-01-01T00:00:00Z", end="2024-01-01T00:10:00Z")
+    ranked = rank([h1, h2], evidence, tr, {"subject_cfg": {}})
     assert ranked[0].id == "h2"

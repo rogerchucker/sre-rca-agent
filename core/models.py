@@ -2,7 +2,19 @@ from __future__ import annotations
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
-EvidenceKind = Literal["alert", "logs", "metrics", "deploy", "change", "trace", "event", "build", "other"]
+EvidenceKind = Literal[
+    "alert",
+    "logs",
+    "metrics",
+    "deploy",
+    "change",
+    "trace",
+    "event",
+    "build",
+    "service_graph",
+    "runbook",
+    "other",
+]
 
 class TimeRange(BaseModel):
     start: str  # RFC3339
@@ -44,7 +56,10 @@ class RCAReport(BaseModel):
     time_range: TimeRange
     top_hypothesis: Hypothesis
     other_hypotheses: List[Hypothesis]
+    fallback_hypotheses: List[Hypothesis] = Field(default_factory=list)
     evidence: List[EvidenceItem]
+    what_changed: Dict[str, Any] = Field(default_factory=dict)
+    impact_scope: Dict[str, Any] = Field(default_factory=dict)
     next_validations: List[str]
 
 # ---- Provider-neutral request objects ----

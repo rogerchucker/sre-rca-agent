@@ -2,6 +2,80 @@ uv run uvicorn api.main:app --reload --port 8080
 uv run python scripts/validate_kb.py
 uv run --extra dev pytest
 
+## Report Schema
+
+The RCA report payload includes these top-level fields:
+- `incident_summary`
+- `time_range`
+- `top_hypothesis`
+- `other_hypotheses`
+- `fallback_hypotheses`
+- `evidence`
+- `what_changed` (deploys/builds/changes)
+- `impact_scope` (error signatures, event reasons, trace ids)
+- `next_validations`
+
+### Example Response
+```json
+{
+  "incident_summary": "High error rate (severity=critical, env=prod)",
+  "time_range": {
+    "start": "2024-01-01T12:00:00Z",
+    "end": "2024-01-01T12:10:00Z"
+  },
+  "top_hypothesis": {
+    "id": "h1",
+    "statement": "A deploy regression introduced a new error signature in the service.",
+    "confidence": 0.78,
+    "score_breakdown": {
+      "coverage": 0.75,
+      "temporal_alignment": 1.0,
+      "kb_match": 1.0,
+      "deploy_signal": 0.8,
+      "specificity": 0.6,
+      "contradiction_penalty": 0.0,
+      "total": 0.78
+    },
+    "supporting_evidence_ids": ["logs_1", "deploy_1", "change_1"],
+    "contradictions": [],
+    "validations": ["Verify error signature appears after the deploy time window."]
+  },
+  "other_hypotheses": [],
+  "fallback_hypotheses": [],
+  "evidence": [
+    {
+      "id": "logs_1",
+      "kind": "logs",
+      "source": "log_store_1",
+      "time_range": {"start": "2024-01-01T12:00:00Z", "end": "2024-01-01T12:10:00Z"},
+      "query": "{app=\"payments\"}",
+      "summary": "Top error signatures computed over the time window.",
+      "samples": [],
+      "top_signals": {"signatures": ["NullPointerException", "DB timeout"]},
+      "pointers": [],
+      "tags": ["logs", "signatures"]
+    }
+  ],
+  "what_changed": {
+    "deployments": [{"deployment_refs": ["run:1"]}],
+    "builds": [],
+    "changes": [{"merged_prs": [{"number": 42, "title": "Bump dependency"}]}]
+  },
+  "impact_scope": {
+    "error_signatures": ["NullPointerException", "DB timeout"],
+    "event_reasons": [],
+    "trace_ids": []
+  },
+  "next_validations": ["Verify error signature appears after the deploy time window."]
+}
+```
+
+## Tracing And Persistence
+
+Optional JSONL tracing and in-memory graph persistence are available via settings:
+- `TRACE_FILE` (path to JSONL file; when set, emits trace events)
+- `ENABLE_PERSISTENCE` (`true`/`false`; when true, enables LangGraph in-memory persistence)
+
 ## Testing
 
 Test tooling is managed via `uv` and lives in the optional `dev` dependency group.
