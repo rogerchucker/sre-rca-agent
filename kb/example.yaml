@@ -1,0 +1,70 @@
+version: 1
+
+providers:
+  - id: "log_store_1"
+    category: "log_store"
+    type: "loki"
+    config:
+      base_url_env: "LOG_STORE_URL"
+      auth:
+        kind: "none"
+        token_env: "LOG_STORE_TOKEN"
+
+  - id: "vcs_1"
+    category: "vcs"
+    type: "github"
+    config:
+      token_env: "VCS_TOKEN"
+      repo_map:
+        SUBJECT_NAME: "REPO_FULL_NAME"
+
+  - id: "deploy_1"
+    category: "deploy_tracker"
+    type: "github_actions"
+    config:
+      token_env: "DEPLOY_TOKEN"
+      repo_map:
+        SUBJECT_NAME: "REPO_FULL_NAME"
+      workflow_path_map:
+        SUBJECT_NAME: ".github/workflows/deploy.yml"
+      markers:
+        environment: "DEPLOY_ENV="
+        service: "DEPLOY_SERVICE="
+        sha: "DEPLOY_SHA="
+        version: "DEPLOY_VERSION="
+        image: "DEPLOY_IMAGE="
+        result: "DEPLOY_RESULT="
+        finished_at: "DEPLOY_FINISHED_AT="
+
+subjects:
+  - name: "SUBJECT_NAME"
+    environment: "ENV_NAME"
+    bindings:
+      log_store: "log_store_1"
+      vcs: "vcs_1"
+      deploy_tracker: "deploy_1"
+
+    log_evidence:
+      stream_selectors:
+        job: "SUBJECT_NAME"
+        level: "ERROR"
+        exporter: "OTLP"
+      parse:
+        format: "json"
+        fields:
+          env: "resources.deployment.environment"
+          version: "resources.service.version"
+          err_type: "attributes.error.type"
+          err_msg: "attributes.error.message"
+          route: "attributes.http.route"
+          status: "attributes.http.status_code"
+          trace_id: "attributes.otelTraceID"
+
+    known_failure_modes:
+      - name: "deploy_regression"
+        indicators:
+          - "new error signature after deploy"
+      - name: "dependency_failure"
+        indicators:
+          - "timeouts"
+          - "connection refused"

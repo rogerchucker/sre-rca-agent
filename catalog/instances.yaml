@@ -1,0 +1,109 @@
+version: 1
+
+# -------------------------------------------------------------------
+# Provider instances available to the agent in THIS environment
+# -------------------------------------------------------------------
+# These are concrete, configured tool endpoints.
+# Subjects bind to these by ID.
+# -------------------------------------------------------------------
+
+providers:
+
+  # ===============================================================
+  # LOG STORE
+  # ===============================================================
+  - id: "log_store_1"
+    category: "log_store"
+    type: "loki"                     # adapter selector (not used by core)
+    capabilities:
+      operations:
+        - "query.signature_counts"
+        - "query.samples"
+    config:
+      base_url_env: "LOG_STORE_URL"
+      auth:
+        kind: "none"                 # bearer_env | oauth_env | basic_env
+        token_env: "LOG_STORE_TOKEN"
+
+  # ===============================================================
+  # VERSION CONTROL SYSTEM
+  # ===============================================================
+  - id: "vcs_1"
+    category: "vcs"
+    type: "github"
+    capabilities:
+      operations:
+        - "list_changes"
+    config:
+      token_env: "VCS_TOKEN"
+
+      # Subject → repo mapping
+      # This keeps subject.yaml clean if you prefer centralized mapping
+      repo_map:
+        hn-backend-demo: "rogerchucker/hn-feed"
+        hn-worker-demo: "rogerchucker/hn-feed"
+        hn-cron-demo: "rogerchucker/hn-feed"
+
+  # ===============================================================
+  # DEPLOYMENT TRACKER (CI/CD as deploy source)
+  # ===============================================================
+  - id: "deploy_1"
+    category: "deploy_tracker"
+    type: "github_actions"
+    capabilities:
+      operations:
+        - "list_deployments"
+        - "get_deployment_metadata"
+    config:
+      token_env: "DEPLOY_TOKEN"
+
+      # Subject → repo mapping
+      repo_map:
+        hn-backend-demo: "rogerchucker/hn-feed"
+        hn-worker-demo: "rogerchucker/hn-feed"
+
+      # Subject → workflow mapping
+      workflow_path_map:
+        hn-backend-demo: ".github/workflows/deploy.yml"
+        hn-worker-demo: ".github/workflows/deploy.yml"
+
+      # Structured markers emitted in workflow logs
+      # (adapter extracts these deterministically)
+      markers:
+        environment: "DEPLOY_ENV="
+        service: "DEPLOY_SERVICE="
+        sha: "DEPLOY_SHA="
+        version: "DEPLOY_VERSION="
+        image: "DEPLOY_IMAGE="
+        result: "DEPLOY_RESULT="
+        finished_at: "DEPLOY_FINISHED_AT="
+
+  # ===============================================================
+  # (OPTIONAL) METRICS STORE – FUTURE EXTENSION
+  # ===============================================================
+  # Uncomment when you add metrics evidence collection
+  #
+  # - id: "metrics_store_1"
+  #   category: "metrics_store"
+  #   type: "prometheus"
+  #   capabilities:
+  #     operations:
+  #       - "query.timeseries"
+  #       - "query.rate"
+  #   config:
+  #     base_url_env: "METRICS_STORE_URL"
+  #     auth:
+  #       kind: "none"
+
+  # ===============================================================
+  # (OPTIONAL) TRACE STORE – FUTURE EXTENSION
+  # ===============================================================
+  # - id: "trace_store_1"
+  #   category: "trace_store"
+  #   type: "jaeger"
+  #   capabilities:
+  #     operations:
+  #       - "find_traces"
+  #       - "get_trace"
+  #   config:
+  #     base_url_env: "TRACE_STORE_URL"

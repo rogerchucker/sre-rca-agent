@@ -1,0 +1,405 @@
+schema_version: "rca.tools.v1"
+doc:
+  purpose: >
+    Canonical, vendor-neutral description of tools/platforms an SRE agent can use to
+    execute an RCA workflow (detect → triage → mitigate → resolve → postmortem).
+  conventions:
+    timestamps: "RFC3339"
+    ids: "stable strings; tools may supply native ids that get mapped into canonical ids"
+    severity_scale: ["info", "warning", "minor", "major", "critical"]
+    environments: ["dev", "staging", "prod"]
+
+# -----------------------------
+# 1) Canonical workflow model
+# -----------------------------
+rca_workflow:
+  phases:
+    - id: detect
+      goal: "Recognize an incident-worthy signal and open/attach to an incident context."
+      required_evidence_types: ["alert", "metric", "log", "trace", "error_event"]
+    - id: triage
+      goal: "Bound blast radius, find likely change correlation, identify suspect components."
+      required_evidence_types: ["service_topology", "deployments", "config_change", "dashboards", "queries"]
+    - id: mitigate
+      goal: "Reduce user impact (rollback, feature-flag, scale, failover) with auditability."
+      required_evidence_types: ["action", "change_request", "deployment", "runbook_step", "approval"]
+    - id: resolve
+      goal: "Confirm recovery and stabilize; ensure monitoring returns to baseline."
+      required_evidence_types: ["slo", "metric", "alert_status", "trace_sample", "log_sample"]
+    - id: postmortem
+      goal: "Produce timeline, contributing factors, root cause hypothesis/evidence, corrective actions."
+      required_evidence_types: ["timeline", "finding", "decision", "action_item", "ownership"]
+
+  correlations:
+    # Fields used to connect disparate tools into one incident graph.
+    keys:
+      - name: service.name
+        description: "Canonical service identifier."
+      - name: service.instance
+        description: "Pod/host/instance identifier."
+      - name: deploy.id
+        description: "Deployment/build identifier."
+      - name: change.id
+        description: "Config/IaC/feature-flag change identifier."
+      - name: trace.id
+        description: "Trace identifier."
+      - name: request.id
+        description: "Request/correlation id (if present)."
+      - name: user.impact.segment
+        description: "Cohort/region/tenant impacted."
+
+# -----------------------------
+# 2) Canonical entities & evidence
+# -----------------------------
+canonical_model:
+  entities:
+    Incident:
+      fields:
+        - {name: id, type: string}
+        - {name: title, type: string}
+        - {name: status, type: string, enum: ["declared", "investigating", "mitigating", "monitoring", "resolved"]}
+        - {name: severity, type: string}
+        - {name: started_at, type: timestamp}
+        - {name: resolved_at, type: timestamp, optional: true}
+        - {name: primary_service, type: string}
+        - {name: impacted_services, type: list[string], optional: true}
+        - {name: links, type: list[Link], optional: true}
+        - {name: labels, type: map[string]string, optional: true}
+        - {name: owners, type: list[Owner], optional: true}
+
+    Service:
+      fields:
+        - {name: name, type: string}
+        - {name: environment, type: string}
+        - {name: tier, type: string, optional: true}
+        - {name: dependencies, type: list[string], optional: true}
+        - {name: runbooks, type: list[Link], optional: true}
+        - {name: slo, type: list[SLORef], optional: true}
+
+    Deployment:
+      fields:
+        - {name: id, type: string}
+        - {name: service.name, type: string}
+        - {name: environment, type: string}
+        - {name: started_at, type: timestamp}
+        - {name: finished_at, type: timestamp, optional: true}
+        - {name: status, type: string, enum: ["started", "succeeded", "failed", "rolled_back", "canceled"]}
+        - {name: version, type: string, optional: true}
+        - {name: commit_sha, type: string, optional: true}
+        - {name: pipeline_ref, type: string, optional: true}
+        - {name: actor, type: string, optional: true}
+        - {name: links, type: list[Link], optional: true}
+
+    Change:
+      fields:
+        - {name: id, type: string}
+        - {name: kind, type: string, enum: ["config", "iac", "feature_flag", "secret", "runtime_setting"]}
+        - {name: subject, type: string} # e.g., service/component/flag name
+        - {name: environment, type: string}
+        - {name: changed_at, type: timestamp}
+        - {name: actor, type: string, optional: true}
+        - {name: diff_summary, type: string, optional: true}
+        - {name: links, type: list[Link], optional: true}
+
+    Evidence:
+      fields:
+        - {name: id, type: string}
+        - {name: incident.id, type: string, optional: true}
+        - {name: phase, type: string} # detect|triage|...
+        - {name: type, type: string,
+           enum: ["alert","metric","log","trace","error_event","deployment","change","dashboard",
+                  "query_result","runbook_step","action","finding","timeline_event","artifact"]}
+        - {name: captured_at, type: timestamp}
+        - {name: source.tool_id, type: string}
+        - {name: source.native_ref, type: string, optional: true}
+        - {name: correlation, type: map[string]string, optional: true}
+        - {name: summary, type: string}
+        - {name: payload, type: any, optional: true}
+        - {name: links, type: list[Link], optional: true}
+        - {name: confidence, type: number, optional: true} # 0..1
+
+  value_types:
+    Link: {fields: [{name: title, type: string}, {name: url, type: string}]}
+    Owner: {fields: [{name: name, type: string}, {name: role, type: string}, {name: contact, type: string, optional: true}]}
+    SLORef: {fields: [{name: name, type: string}, {name: objective, type: string}, {name: link, type: Link, optional: true}]}
+
+# -----------------------------
+# 3) Tool / platform descriptors (the “grand schema”)
+# -----------------------------
+tool_catalog:
+  # Each entry describes ONE tool/platform adapter instance.
+  # The core agent uses these declarations to:
+  # - understand capabilities
+  # - map canonical entities to native APIs
+  # - run queries/actions safely with audit trails
+  tools:
+    - tool_id: "observability.primary"
+      display_name: "Primary Observability"
+      tool_kind: "observability"  # observability|incident_mgmt|cicd|iac|runtime|secrets|ticketing|docs|chat|database|edge|app_hosting|other
+      deployment_scope:
+        environment: "prod"
+        regions: ["us", "eu"]
+      ownership:
+        team: "platform-sre"
+        escalation: "oncall-primary"
+
+      # Capability inventory (what the agent can do here)
+      capabilities:
+        read:
+          - type: "metrics"
+            operations: ["timeseries_query", "topk", "heatmap", "anomaly_summary"]
+          - type: "logs"
+            operations: ["search", "tail", "aggregate", "exemplar_lookup"]
+          - type: "traces"
+            operations: ["search", "trace_by_id", "span_aggregate"]
+          - type: "dashboards"
+            operations: ["list", "snapshot"]
+          - type: "alerts"
+            operations: ["list", "get", "ack_status"]
+        write:
+          - type: "annotations"
+            operations: ["create"]     # e.g., deploy markers
+          - type: "alert_actions"
+            operations: ["acknowledge", "silence", "resolve"]
+        execute:
+          - type: "saved_queries"
+            operations: ["run"]
+
+      # Native connectivity & auth (kept adapter-specific; agent core reads but doesn’t hardcode)
+      connection:
+        transport: "https"            # https|grpc|sdk|ssh|other
+        base_url: "${OBS_BASE_URL}"
+        auth:
+          scheme: "oauth2"            # api_key|oauth2|jwt|mtls|basic|other
+          token_env: "OBS_TOKEN"
+        rate_limits:
+          default_rps: 5
+          burst: 10
+        timeouts:
+          connect_ms: 2000
+          request_ms: 15000
+
+      # Mapping between canonical concepts and tool-native shapes
+      mappings:
+        identity:
+          service_name_field: "service"
+          environment_field: "env"
+          trace_id_field: "trace_id"
+          request_id_field: "request_id"
+        entity_links:
+          dashboard_url_template: "${OBS_BASE_URL}/dashboards/{id}"
+          log_explorer_url_template: "${OBS_BASE_URL}/logs?query={query}"
+          trace_url_template: "${OBS_BASE_URL}/traces/{trace_id}"
+
+      # Guardrails & policies
+      policies:
+        data_access:
+          allowed_environments: ["prod", "staging"]
+          pii_handling: "redact"       # allow|redact|deny
+        action_safety:
+          requires_approval_for:
+            - "silence_alerts"
+            - "resolve_alerts"
+          approval_roles: ["incident_commander", "oncall-primary"]
+        audit:
+          emit_evidence_for_all_reads: true
+          emit_evidence_for_all_writes: true
+
+      # How to turn tool outputs into canonical Evidence records
+      evidence_rules:
+        - when: {operation: "timeseries_query"}
+          produce:
+            type: "metric"
+            summary_template: "Metric query: {query} ({window})"
+        - when: {operation: "search_logs"}
+          produce:
+            type: "log"
+            summary_template: "Log search: {query} ({window})"
+        - when: {operation: "trace_by_id"}
+          produce:
+            type: "trace"
+            summary_template: "Trace: {trace_id}"
+
+    - tool_id: "incident_mgmt.primary"
+      display_name: "Incident Management"
+      tool_kind: "incident_mgmt"
+      capabilities:
+        read:
+          - type: "incidents"
+            operations: ["list", "get", "timeline"]
+          - type: "oncall"
+            operations: ["get_schedule"]
+        write:
+          - type: "incidents"
+            operations: ["create", "update_status", "add_note", "add_responder"]
+      connection:
+        transport: "https"
+        base_url: "${IM_BASE_URL}"
+        auth: {scheme: "api_key", token_env: "IM_TOKEN"}
+      mappings:
+        incident_fields:
+          title: "title"
+          status: "status"
+          severity: "severity"
+          started_at: "created_at"
+          resolved_at: "resolved_at"
+      policies:
+        audit: {emit_evidence_for_all_writes: true}
+
+    - tool_id: "cicd.primary"
+      display_name: "CI/CD"
+      tool_kind: "cicd"
+      capabilities:
+        read:
+          - type: "pipelines"
+            operations: ["list_by_service", "get", "list_runs", "get_run_logs"]
+          - type: "deployments"
+            operations: ["list", "get", "diff", "rollback_targets"]
+        write:
+          - type: "deployments"
+            operations: ["trigger", "rollback"]
+      connection:
+        transport: "https"
+        base_url: "${CICD_BASE_URL}"
+        auth: {scheme: "oauth2", token_env: "CICD_TOKEN"}
+      mappings:
+        deployment_ref:
+          # IMPORTANT for multi-subject: deployment_ref encodes the origin subject so the agent never “infers”.
+          # Examples: "run:<repo_full_name>:<run_id>" or "deploy:<project>:<id>"
+          canonical_format: "{kind}:{subject}:{id}"
+      policies:
+        action_safety:
+          requires_approval_for: ["trigger_deploy", "rollback"]
+          approval_roles: ["incident_commander", "release_manager"]
+
+    - tool_id: "runtime.primary"
+      display_name: "Runtime Orchestrator"
+      tool_kind: "runtime"
+      capabilities:
+        read:
+          - type: "workloads"
+            operations: ["list", "describe", "events", "logs"]
+          - type: "nodes"
+            operations: ["list", "describe"]
+        write:
+          - type: "workloads"
+            operations: ["scale", "restart", "rollout_status"]
+      connection:
+        transport: "sdk"
+        auth: {scheme: "mtls", token_env: "RUNTIME_KUBECONFIG"}
+      policies:
+        action_safety:
+          requires_approval_for: ["scale", "restart"]
+
+    - tool_id: "iac.primary"
+      display_name: "Infrastructure as Code"
+      tool_kind: "iac"
+      capabilities:
+        read:
+          - type: "changes"
+            operations: ["list_prs", "get_pr", "diff"]
+        write:
+          - type: "changes"
+            operations: ["open_pr", "comment"]
+      connection:
+        transport: "https"
+        auth: {scheme: "oauth2", token_env: "IAC_TOKEN"}
+
+    - tool_id: "secrets.primary"
+      display_name: "Secrets & Config"
+      tool_kind: "secrets"
+      capabilities:
+        read:
+          - type: "secrets_metadata"
+            operations: ["get_versions", "audit_events"]
+        write:
+          - type: "rotation"
+            operations: ["rotate", "revoke"]
+      connection:
+        transport: "https"
+        auth: {scheme: "jwt", token_env: "SECRETS_TOKEN"}
+      policies:
+        data_access:
+          pii_handling: "deny"
+        action_safety:
+          requires_approval_for: ["revoke", "rotate"]
+
+# -----------------------------
+# 4) Cross-tool playbooks (vendor-neutral)
+# -----------------------------
+playbooks:
+  # These are “recipes” the agent can execute using any compatible tools from the catalog.
+  # Each step references capability types, not vendors.
+  - id: "rca.quick_triage"
+    name: "Quick triage: correlate signals with recent changes"
+    inputs:
+      - incident.id
+      - service.name
+      - environment
+      - time_window: {default: "PT60M"} # 60 minutes
+    steps:
+      - id: "collect_alerts"
+        uses: {tool_kind: "observability", operation: "alerts.list"}
+        emit_evidence: true
+      - id: "collect_golden_signals"
+        uses: {tool_kind: "observability", operation: "metrics.timeseries_query"}
+        params:
+          queries:
+            - "latency_p95"
+            - "error_rate"
+            - "throughput"
+            - "saturation"
+      - id: "collect_logs"
+        uses: {tool_kind: "observability", operation: "logs.search"}
+        params: {query: "service:{service.name} AND env:{environment}"}
+      - id: "find_recent_deploys"
+        uses: {tool_kind: "cicd", operation: "deployments.list"}
+        params: {service: "{service.name}", window: "{time_window}"}
+      - id: "find_recent_changes"
+        uses: {tool_kind: "iac", operation: "changes.list_prs"}
+        params: {service: "{service.name}", window: "{time_window}"}
+      - id: "summarize_hypotheses"
+        action: "agent_reasoning"
+        output:
+          findings:
+            - "Top suspected change(s)"
+            - "Most impacted endpoints/dependencies"
+            - "Next best queries"
+
+  - id: "rca.mitigation.rollback"
+    name: "Mitigation: rollback last known good deployment"
+    inputs: [incident.id, service.name, environment]
+    steps:
+      - id: "select_rollback_target"
+        uses: {tool_kind: "cicd", operation: "deployments.rollback_targets"}
+      - id: "request_approval"
+        action: "approval_gate"
+        policy_ref: "tool_catalog.tools[cicd.primary].policies.action_safety"
+      - id: "execute_rollback"
+        uses: {tool_kind: "cicd", operation: "deployments.rollback"}
+        emit_evidence: true
+      - id: "verify_recovery"
+        uses: {tool_kind: "observability", operation: "metrics.timeseries_query"}
+        params: {queries: ["error_rate", "latency_p95"], window: "PT30M"}
+
+# -----------------------------
+# 5) Adapter contract (what every adapter must implement)
+# -----------------------------
+adapter_contract:
+  required_methods:
+    - name: "health_check"
+      returns: ["ok:boolean", "details:map"]
+    - name: "capabilities"
+      returns: ["capability_manifest"]
+    - name: "read"
+      args: ["operation", "params"]
+      returns: ["native_result", "evidence:Evidence[]"]
+    - name: "write"
+      args: ["operation", "params"]
+      returns: ["native_result", "evidence:Evidence[]"]
+  normalization:
+    # How adapters must translate native results into canonical entities/evidence.
+    must_produce:
+      - "correlation keys when present (service.name, env, deploy.id, request.id, trace.id)"
+      - "stable source.native_ref for deep-links"
+      - "captured_at timestamp for every evidence item"
