@@ -17,6 +17,7 @@ def _set_env(monkeypatch):
     monkeypatch.setenv("LOG_STORE_URL", "https://loki.example.invalid")
     monkeypatch.setenv("VCS_TOKEN", "test-vcs")
     monkeypatch.setenv("DEPLOY_TOKEN", "test-deploy")
+    monkeypatch.setenv("BUILD_TOKEN", "test-build")
 
 
 @pytest.fixture

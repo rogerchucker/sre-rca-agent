@@ -79,31 +79,80 @@ providers:
         finished_at: "DEPLOY_FINISHED_AT="
 
   # ===============================================================
-  # (OPTIONAL) METRICS STORE – FUTURE EXTENSION
+  # BUILD TRACKER (CI WORKFLOW RUNS)
   # ===============================================================
-  # Uncomment when you add metrics evidence collection
-  #
-  # - id: "metrics_store_1"
-  #   category: "metrics_store"
-  #   type: "prometheus"
-  #   capabilities:
-  #     operations:
-  #       - "query.timeseries"
-  #       - "query.rate"
-  #   config:
-  #     base_url_env: "METRICS_STORE_URL"
-  #     auth:
-  #       kind: "none"
+  - id: "build_1"
+    category: "build_tracker"
+    type: "github_actions"
+    capabilities:
+      operations:
+        - "list_builds"
+    config:
+      token_env: "BUILD_TOKEN"
+      repo_map:
+        hn-backend-demo: "rogerchucker/hn-feed"
+        hn-worker-demo: "rogerchucker/hn-feed"
+        hn-cron-demo: "rogerchucker/hn-feed"
+      workflow_path_map:
+        hn-backend-demo: ".github/workflows/build.yml"
+        hn-worker-demo: ".github/workflows/build.yml"
+        hn-cron-demo: ".github/workflows/build.yml"
+      markers:
+        environment: "BUILD_ENV="
+        service: "BUILD_SERVICE="
+        sha: "BUILD_SHA="
+        version: "BUILD_VERSION="
+        image: "BUILD_IMAGE="
+        result: "BUILD_RESULT="
 
   # ===============================================================
-  # (OPTIONAL) TRACE STORE – FUTURE EXTENSION
+  # RUNTIME (KUBECTL)
   # ===============================================================
-  # - id: "trace_store_1"
-  #   category: "trace_store"
-  #   type: "jaeger"
-  #   capabilities:
-  #     operations:
-  #       - "find_traces"
-  #       - "get_trace"
-  #   config:
-  #     base_url_env: "TRACE_STORE_URL"
+  - id: "runtime_1"
+    category: "runtime"
+    type: "kubectl"
+    capabilities:
+      operations:
+        - "get_logs"
+        - "get_events"
+    config:
+      kubeconfig_env: "KUBECONFIG"
+      context: "KUBE_CONTEXT"
+      namespace_map:
+        hn-backend-demo: "default"
+        hn-worker-demo: "default"
+        hn-cron-demo: "default"
+      selector_map:
+        hn-backend-demo: "app=hn-backend-demo"
+        hn-worker-demo: "app=hn-worker-demo"
+        hn-cron-demo: "app=hn-cron-demo"
+
+  # ===============================================================
+  # METRICS STORE
+  # ===============================================================
+  - id: "metrics_1"
+    category: "metrics_store"
+    type: "prometheus"
+    capabilities:
+      operations:
+        - "query_range"
+    config:
+      base_url_env: "METRICS_URL"
+      auth:
+        kind: "none"
+        token_env: "METRICS_TOKEN"
+
+  # ===============================================================
+  # TRACE STORE
+  # ===============================================================
+  - id: "trace_1"
+    category: "trace_store"
+    type: "jaeger"
+    capabilities:
+      operations:
+        - "search_traces"
+    config:
+      base_url_env: "TRACE_URL"
+      auth:
+        kind: "none"
+        token_env: "TRACE_TOKEN"

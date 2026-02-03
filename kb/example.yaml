@@ -36,6 +36,45 @@ providers:
         result: "DEPLOY_RESULT="
         finished_at: "DEPLOY_FINISHED_AT="
 
+  - id: "build_1"
+    category: "build_tracker"
+    type: "github_actions"
+    config:
+      token_env: "BUILD_TOKEN"
+      repo_map:
+        SUBJECT_NAME: "REPO_FULL_NAME"
+      workflow_path_map:
+        SUBJECT_NAME: ".github/workflows/build.yml"
+
+  - id: "runtime_1"
+    category: "runtime"
+    type: "kubectl"
+    config:
+      kubeconfig_env: "KUBECONFIG"
+      context: "CLUSTER_CONTEXT"
+      namespace_map:
+        SUBJECT_NAME: "NAMESPACE"
+      selector_map:
+        SUBJECT_NAME: "app=SUBJECT_NAME"
+
+  - id: "metrics_1"
+    category: "metrics_store"
+    type: "prometheus"
+    config:
+      base_url_env: "METRICS_URL"
+      auth:
+        kind: "none"
+        token_env: "METRICS_TOKEN"
+
+  - id: "trace_1"
+    category: "trace_store"
+    type: "jaeger"
+    config:
+      base_url_env: "TRACE_URL"
+      auth:
+        kind: "none"
+        token_env: "TRACE_TOKEN"
+
 subjects:
   - name: "SUBJECT_NAME"
     environment: "ENV_NAME"
@@ -43,6 +82,10 @@ subjects:
       log_store: "log_store_1"
       vcs: "vcs_1"
       deploy_tracker: "deploy_1"
+      build_tracker: "build_1"
+      runtime: "runtime_1"
+      metrics_store: "metrics_1"
+      trace_store: "trace_1"
 
     log_evidence:
       stream_selectors:

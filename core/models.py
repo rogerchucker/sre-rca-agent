@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
-EvidenceKind = Literal["alert", "logs", "metrics", "deploy", "change", "trace", "other"]
+EvidenceKind = Literal["alert", "logs", "metrics", "deploy", "change", "trace", "event", "build", "other"]
 
 class TimeRange(BaseModel):
     start: str  # RFC3339
@@ -73,6 +73,44 @@ class ChangeQueryRequest(BaseModel):
     include_commits: bool = False
     limit: int = 30
 
+class BuildQueryRequest(BaseModel):
+    subject: str
+    environment: str
+    time_range: TimeRange
+    limit: int = 30
+
+class MetricsQueryRequest(BaseModel):
+    subject: str
+    environment: str
+    time_range: TimeRange
+    query: str
+    step_seconds: int = 60
+    limit: int = 50
+
+class TraceQueryRequest(BaseModel):
+    subject: str
+    environment: str
+    time_range: TimeRange
+    service_name: Optional[str] = None
+    limit: int = 20
+
+class EventQueryRequest(BaseModel):
+    subject: str
+    environment: str
+    time_range: TimeRange
+    namespace: Optional[str] = None
+    selector: Optional[str] = None
+    limit: int = 200
+
+class K8sLogQueryRequest(BaseModel):
+    subject: str
+    environment: str
+    time_range: TimeRange
+    namespace: Optional[str] = None
+    selector: Optional[str] = None
+    container: Optional[str] = None
+    limit: int = 200
+
 # ---- Core execution state ----
 
 class AgentState(BaseModel):
@@ -80,4 +118,6 @@ class AgentState(BaseModel):
     kb_slice: Dict[str, Any] = Field(default_factory=dict)
     evidence: List[EvidenceItem] = Field(default_factory=list)
     hypotheses: List[Hypothesis] = Field(default_factory=list)
+    plan: List[Dict[str, Any]] = Field(default_factory=list)
+    iteration: int = 0
     report: Optional[RCAReport] = None

@@ -2,7 +2,15 @@ from __future__ import annotations
 from typing import Any, Dict, Protocol
 
 from core.models import (
-    EvidenceItem, LogQueryRequest, DeployQueryRequest, ChangeQueryRequest
+    EvidenceItem,
+    LogQueryRequest,
+    DeployQueryRequest,
+    ChangeQueryRequest,
+    BuildQueryRequest,
+    MetricsQueryRequest,
+    TraceQueryRequest,
+    EventQueryRequest,
+    K8sLogQueryRequest,
 )
 
 # ---- Provider protocols (core-neutral) ----
@@ -16,6 +24,20 @@ class DeployTrackerProvider(Protocol):
 
 class VCSProvider(Protocol):
     def list_changes(self, req: ChangeQueryRequest) -> EvidenceItem: ...
+
+class BuildTrackerProvider(Protocol):
+    def list_builds(self, req: BuildQueryRequest) -> EvidenceItem: ...
+    def get_build_metadata(self, build_ref: str) -> EvidenceItem: ...
+
+class MetricsStoreProvider(Protocol):
+    def query_range(self, req: MetricsQueryRequest) -> EvidenceItem: ...
+
+class TraceStoreProvider(Protocol):
+    def search_traces(self, req: TraceQueryRequest) -> EvidenceItem: ...
+
+class RuntimeProvider(Protocol):
+    def get_logs(self, req: K8sLogQueryRequest) -> EvidenceItem: ...
+    def get_events(self, req: EventQueryRequest) -> EvidenceItem: ...
 
 # ---- Registry ----
 

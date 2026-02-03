@@ -1,5 +1,5 @@
 from core.orchestrator import normalize_incident, seed_alert_evidence, score_and_report, _shift_rfc3339
-from core.models import Hypothesis
+from core.models import EvidenceItem, TimeRange
 
 
 def test_normalize_incident_time_buffer():
@@ -75,3 +75,96 @@ def test_normalize_incident_skips_when_present():
     }
     out = normalize_incident(state)
     assert out["incident"]["subject"] == "payments"
+
+
+def test_score_and_report_sets_iteration_flag_for_low_confidence():
+    tr = TimeRange(start="2024-01-01T12:00:00Z", end="2024-01-01T12:10:00Z")
+    state = {
+        "incident": {
+            "title": "t",
+            "severity": "s",
+            "environment": "prod",
+            "subject": "payments",
+            "time_range": tr.model_dump(),
+            "labels": {},
+            "annotations": {},
+            "raw": {},
+        },
+        "evidence": [],
+        "hypotheses": [
+            {
+                "id": "h1",
+                "statement": "Minor issue.",
+                "confidence": 0.0,
+                "score_breakdown": {},
+                "supporting_evidence_ids": [],
+                "contradictions": [],
+                "validations": [],
+            }
+        ],
+        "iteration": 0,
+    }
+
+    out = score_and_report(state)
+    assert out["should_iterate"] is True
+    assert out["iteration"] == 1
+
+
+def test_score_and_report_stops_when_confident():
+    tr = TimeRange(start="2024-01-01T12:00:00Z", end="2024-01-01T12:10:00Z")
+    evidence = [
+        EvidenceItem(
+            id="e_logs",
+            kind="logs",
+            source="s1",
+            time_range=tr,
+            query="q",
+            summary="s",
+        ),
+        EvidenceItem(
+            id="e_deploy",
+            kind="deploy",
+            source="s2",
+            time_range=tr,
+            query="q",
+            summary="s",
+            top_signals={"deployment_refs": ["run:1"]},
+        ),
+        EvidenceItem(
+            id="e_change",
+            kind="change",
+            source="s3",
+            time_range=tr,
+            query="q",
+            summary="s",
+        ),
+    ]
+    state = {
+        "incident": {
+            "title": "t",
+            "severity": "s",
+            "environment": "prod",
+            "subject": "payments",
+            "time_range": tr.model_dump(),
+            "labels": {},
+            "annotations": {},
+            "raw": {},
+        },
+        "evidence": [e.model_dump() for e in evidence],
+        "hypotheses": [
+            {
+                "id": "h1",
+                "statement": "This is a sufficiently long hypothesis statement to score specificity well.",
+                "confidence": 0.0,
+                "score_breakdown": {},
+                "supporting_evidence_ids": ["e_logs", "e_deploy", "e_change"],
+                "contradictions": [],
+                "validations": [],
+            }
+        ],
+        "iteration": 1,
+    }
+
+    out = score_and_report(state)
+    assert out["should_iterate"] is False
+    assert out["iteration"] == 1

@@ -10,6 +10,10 @@ subjects:
       log_store: "log_store_1"
       deploy_tracker: "deploy_1"
       vcs: "vcs_1"
+      build_tracker: "build_1"
+      runtime: "runtime_1"
+      metrics_store: "metrics_1"
+      trace_store: "trace_1"
 
     log_evidence:
       stream_selectors:
@@ -53,6 +57,10 @@ subjects:
       log_store: "log_store_1"
       deploy_tracker: "deploy_1"
       vcs: "vcs_1"
+      build_tracker: "build_1"
+      runtime: "runtime_1"
+      metrics_store: "metrics_1"
+      trace_store: "trace_1"
 
     log_evidence:
       stream_selectors:
@@ -94,6 +102,10 @@ subjects:
       log_store: "log_store_1"
       vcs: "vcs_1"
       # NOTE: no deploy_tracker binding on purpose
+      build_tracker: "build_1"
+      runtime: "runtime_1"
+      metrics_store: "metrics_1"
+      trace_store: "trace_1"
 
     log_evidence:
       stream_selectors:
