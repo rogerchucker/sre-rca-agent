@@ -1,3 +1,15 @@
+# Original Ask
+
+I want to build an SRE agent from the ground up using Langgraph with OpenAI that focuses only one type of workflow -- investigations and root cause analysis. The input can be an incident or an alert reaching the agent through a standard webhook. Investigations require two types of information to start with —  evidence from temporal sources (telemetry, build and deployment history, change history which includes github commits) and pre-exisitng knowledge-base (i.e. dependency graphs, runbooks, association between tool category and actual tool being used, documentation on how the tool is being used, root causes of past incidents, feature documentation, etc.). The knowledge-base is what we onboard through the onboarding process (for now let’s limit that to the static one time configuration YAML file.
+
+The evidence should collected from the logging infrastructure if applicable — this could mean querying Loki logs if the underlying stack uses Loki, or cloudwatch., or Splunk. This could also mean kubectll logs and kubectl events.  Other evidence sources can be build history and logs, code commits history and change details, deployment history. 
+
+The evidence collected (within a timeframe matching the alert or the incident) along with the aforementioned knowledgebase should be sent for correlation and come up with root cause hypotheses. The recommendation coming back from the LLM should the one for the hypotheses with the highest confidence level.
+
+The demo scenarios (both live and doks demos and in general) should be simply about deliberately triggering external systems into a state that trigger their corresponding alerts and also about deliberately reseting these changes. The rest of the demo flows should be the actual agentic flow as we described above.
+
+The core of this tool should not refer to any specific tool or platform or vendor. I also don't want references to applications (like hn-feed or hn-backend-demo etc) in the core. Please show all the code of the core and the adapters accordingly including the new project structure
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization

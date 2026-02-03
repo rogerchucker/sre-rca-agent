@@ -1,4 +1,38 @@
-uvicorn api.main:app --reload --port 8080
+uv run uvicorn api.main:app --reload --port 8080
+uv run python scripts/validate_kb.py
+uv run --extra dev pytest
+
+## Testing
+
+Test tooling is managed via `uv` and lives in the optional `dev` dependency group.
+
+### Install test dependencies
+```bash
+uv sync --extra dev
+```
+
+### Run the full test suite
+```bash
+uv run --extra dev pytest
+```
+
+### Run only unit tests
+```bash
+uv run --extra dev pytest tests/unit
+```
+
+### Run only integration tests
+```bash
+uv run --extra dev pytest tests/integration
+```
+
+### Notes
+- Tests add the repo root to `sys.path` to allow imports like `core/`, `providers/`, and `api/`.
+- Integration tests stub external providers and the LLM client; no network calls are made.
+- If you update `kb/` or `catalog/`, also run:
+```bash
+uv run python scripts/validate_kb.py
+```
 
 flowchart TB
   subgraph A[Global Tool Schema]
