@@ -10,6 +10,7 @@ Build an SRE RCA agent using LangGraph + OpenAI. It accepts incidents/alerts via
 - **API Entry**: FastAPI app in `api/` (local run via `uvicorn api.main:app`).
 - **Validation**: KB/catalog consistency check script at `scripts/validate_kb.py`.
 - **Docs**: `docs/onboarding.md` includes onboarding guidance.
+- **Tests**: Unit + integration tests exist under `tests/` and run via `uv run --extra dev pytest`.
 
 ## What Is Operational vs. Not Yet
 ### Operational (Local)
@@ -35,9 +36,9 @@ Build an SRE RCA agent using LangGraph + OpenAI. It accepts incidents/alerts via
 
 ## Next Milestones
 ### M1: Webhook + Request Model
-- Define request schema for incident/alert input.
-- Add `/webhook/incident` endpoint with validation.
-- Map timeframe + subject selectors into the core workflow.
+- [x] Define request schema for incident/alert input.
+- [x] Add `/webhook/incident` endpoint with validation.
+- [x] Map timeframe + subject selectors into the core workflow.
 
 ### M2: Evidence Adapters (MVP)
 - Implement one `log_store` (e.g., Loki or CloudWatch).
@@ -59,6 +60,7 @@ Build an SRE RCA agent using LangGraph + OpenAI. It accepts incidents/alerts via
 - [ ] Implement and configure at least one provider per capability
 - [ ] Validate KB/catalog with `uv run python scripts/validate_kb.py`
 - [ ] Run an end-to-end RCA call against a real incident payload
+- [ ] Run tests with `uv run --extra dev pytest`
 
 ## Open Questions
 - Which provider stack should be the first supported path (Loki vs CloudWatch vs Splunk)?

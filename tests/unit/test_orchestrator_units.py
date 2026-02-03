@@ -58,3 +58,20 @@ def test_score_and_report_fallback():
     report = out["report"]
     assert "Insufficient evidence" in report["top_hypothesis"]["statement"]
     assert report["top_hypothesis"]["confidence"] == 0.0
+
+
+def test_normalize_incident_skips_when_present():
+    state = {
+        "incident": {
+            "title": "t",
+            "severity": "s",
+            "environment": "prod",
+            "subject": "payments",
+            "time_range": {"start": "2024-01-01T12:00:00Z", "end": "2024-01-01T12:10:00Z"},
+            "labels": {},
+            "annotations": {},
+            "raw": {},
+        }
+    }
+    out = normalize_incident(state)
+    assert out["incident"]["subject"] == "payments"

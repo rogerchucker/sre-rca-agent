@@ -59,6 +59,8 @@ def normalize_incident(state: Dict[str, Any]) -> Dict[str, Any]:
     Accepts a webhook payload and maps it into a vendor-neutral IncidentInput.
     This parser is intentionally tolerant and does not assume a specific alerting product.
     """
+    if state.get("incident"):
+        return state
     raw = state.get("raw_webhook", {})
     alerts = raw.get("alerts") or []
     a0 = alerts[0] if alerts else raw
@@ -333,5 +335,10 @@ GRAPH = build_graph()
 
 def run(webhook_payload: dict) -> dict:
     state = {"raw_webhook": webhook_payload}
+    out = GRAPH.invoke(state)
+    return out.get("report", out)
+
+def run_incident(incident: IncidentInput) -> dict:
+    state = {"incident": incident.model_dump()}
     out = GRAPH.invoke(state)
     return out.get("report", out)
