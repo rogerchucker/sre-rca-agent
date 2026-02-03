@@ -10,6 +10,10 @@ The demo scenarios (both live and doks demos and in general) should be simply ab
 
 The core of this tool should not refer to any specific tool or platform or vendor. I also don't want references to applications (like hn-feed or hn-backend-demo etc) in the core. Please show all the code of the core and the adapters accordingly including the new project structure
 
+# Review Outline
+
+Always review @OUTLINE.md to ensure the project is not deviating. If it is, call out the drifts and if approved by me, update @OUTLINE.md as exceptions in the corresponding sections.
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization
