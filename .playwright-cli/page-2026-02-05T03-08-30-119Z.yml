@@ -1,0 +1,54 @@
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]: Operations Portal
+      - generic [ref=e8]: Agentic SRE Control Plane
+      - generic [ref=e9]: Live Mode
+    - navigation [ref=e10]:
+      - link "Overview" [ref=e11] [cursor=pointer]:
+        - /url: /
+      - link "Systems Access" [ref=e12] [cursor=pointer]:
+        - /url: /systems
+      - link "Knowledge Base" [ref=e13] [cursor=pointer]:
+        - /url: /knowledge
+    - generic [ref=e14]:
+      - text: "Trust: human approval required"
+      - text: "Env: prod / staging"
+      - text: "Access: read-only by default"
+  - main [ref=e16]:
+    - generic [ref=e19]: No incidents opened
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - generic [ref=e24]: Agent performance
+            - generic [ref=e25]: Investigation throughput & reliability
+          - generic [ref=e26]: "API Health: Connected"
+        - generic [ref=e27]:
+          - generic [ref=e28]:
+            - generic [ref=e29]: Completed (24h)
+            - generic [ref=e30]: "0"
+          - generic [ref=e31]:
+            - generic [ref=e32]: Completed (30d)
+            - generic [ref=e33]: "0"
+          - generic [ref=e34]:
+            - generic [ref=e35]: Avg resolve time
+            - generic [ref=e36]: —
+          - generic "Not instrumented" [ref=e37]:
+            - generic [ref=e38]: Avg reopens
+            - generic [ref=e39]: —
+      - generic [ref=e40]:
+        - generic [ref=e41]: Live RCA
+        - generic [ref=e42]: Run RCA on a live incident
+        - paragraph [ref=e43]: Trigger an investigation, gather evidence, and produce a recommendation. The report will appear in the incident tab bar.
+        - button "Run Demo RCA" [ref=e44] [cursor=pointer]
+        - generic [ref=e45]:
+          - generic [ref=e46]: Attention queue
+          - generic [ref=e48]: No items in attention queue.
+    - generic [ref=e49]:
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - generic [ref=e52]: Recent investigations
+          - generic [ref=e53]: Latest investigations across the fleet
+        - generic [ref=e54]: Showing 0 records
+      - generic [ref=e55]: No investigations available.

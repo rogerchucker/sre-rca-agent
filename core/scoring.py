@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Dict, List
 from core.models import EvidenceItem, Hypothesis, TimeRange
 
-EVIDENCE_TYPES = {"logs", "event", "deploy", "change", "build", "metrics", "trace"}
+EVIDENCE_TYPES = {"log", "event", "deployment", "change", "build", "metric", "trace"}
 
 def score_hypothesis(
     h: Hypothesis,
@@ -19,7 +19,7 @@ def score_hypothesis(
 
     deploy_signal = 0.0
     for e in used:
-        if e and e.kind in {"deploy", "build"} and e.top_signals:
+        if e and e.kind in {"deployment", "build"} and e.top_signals:
             deploy_signal = 0.8
             break
 

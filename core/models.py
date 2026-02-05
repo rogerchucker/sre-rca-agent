@@ -4,9 +4,9 @@ from pydantic import BaseModel, Field
 
 EvidenceKind = Literal[
     "alert",
-    "logs",
-    "metrics",
-    "deploy",
+    "log",
+    "metric",
+    "deployment",
     "change",
     "trace",
     "event",
@@ -58,6 +58,7 @@ class RCAReport(BaseModel):
     other_hypotheses: List[Hypothesis]
     fallback_hypotheses: List[Hypothesis] = Field(default_factory=list)
     evidence: List[EvidenceItem]
+    supporting_evidence: List[str] = Field(default_factory=list)
     what_changed: Dict[str, Any] = Field(default_factory=dict)
     impact_scope: Dict[str, Any] = Field(default_factory=dict)
     next_validations: List[str]
@@ -108,6 +109,12 @@ class TraceQueryRequest(BaseModel):
     time_range: TimeRange
     service_name: Optional[str] = None
     limit: int = 20
+
+class AlertQueryRequest(BaseModel):
+    subject: str
+    environment: str
+    time_range: TimeRange
+    label_filters: List[str] = Field(default_factory=list)
 
 class EventQueryRequest(BaseModel):
     subject: str

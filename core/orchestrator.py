@@ -12,8 +12,9 @@ from core.models import (
     AgentState, IncidentInput, EvidenceItem, Hypothesis, RCAReport,
     LogQueryRequest, DeployQueryRequest, ChangeQueryRequest, TimeRange,
     BuildQueryRequest, MetricsQueryRequest, TraceQueryRequest,
-    EventQueryRequest, K8sLogQueryRequest
+    AlertQueryRequest, EventQueryRequest, K8sLogQueryRequest
 )
+from core.environment import canonicalize_environment
 from core.prompts import SYSTEM_PROMPT, HYPOTHESIS_TASK, PLAN_TASK, EVIDENCE_TOOL_SYSTEM
 from core.scoring import rank
 from core.tracing import get_tracer
@@ -78,7 +79,7 @@ def normalize_incident(state: Dict[str, Any]) -> Dict[str, Any]:
     annotations = a0.get("annotations") or raw.get("annotations") or {}
 
     subject = labels.get("subject") or labels.get("service") or labels.get("job") or "unknown"
-    environment = labels.get("environment") or labels.get("env") or "unknown"
+    environment_raw = labels.get("environment") or labels.get("env") or "unknown"
     severity = labels.get("severity") or labels.get("level") or "unknown"
 
     title = annotations.get("summary") or annotations.get("description") or labels.get("alertname") or "incident"
@@ -92,6 +93,7 @@ def normalize_incident(state: Dict[str, Any]) -> Dict[str, Any]:
     # Small buffer before start
     tr = TimeRange(start=_shift_rfc3339(starts_at, -10), end=ends_at)
 
+    environment = canonicalize_environment(environment_raw)
     incident = IncidentInput(
         title=title,
         severity=severity,
@@ -115,7 +117,7 @@ def load_kb_slice(state: Dict[str, Any]) -> Dict[str, Any]:
     kb = KB.load(settings.kb_path)
 
     subject_cfg = kb.get_subject_config(incident.subject, incident.environment)
-    provider_instances = kb.get_provider_instances()
+    provider_instances = KB.load_providers(settings.catalog_path)
 
     registry = ProviderRegistry(factories=FACTORIES, instances_config=provider_instances)
 
@@ -352,7 +354,7 @@ def score_and_report(state: Dict[str, Any]) -> Dict[str, Any]:
             confidence=0.0,
             score_breakdown={"total": 0.0},
             supporting_evidence_ids=[],
-            validations=["Collect additional logs and deploy/change context for the time window."],
+            validations=["Collect additional logs and deployment/change context for the time window."],
             contradictions=[],
         )
         others = []
@@ -365,6 +367,7 @@ def score_and_report(state: Dict[str, Any]) -> Dict[str, Any]:
         other_hypotheses=others,
         fallback_hypotheses=others[:3],
         evidence=evidence,
+        supporting_evidence=_format_supporting_evidence(top, evidence),
         what_changed=_derive_what_changed(evidence),
         impact_scope=_derive_impact_scope(evidence),
         next_validations=next_validations,
@@ -398,6 +401,7 @@ def _add_kb_evidence_items(evidence: List[EvidenceItem], subject_cfg: Dict[str, 
     # Service graph evidence (dependencies)
     deps = subject_cfg.get("dependencies", [])
     if deps and not any(e.kind == "service_graph" for e in evidence):
+        graph = _build_service_graph(subject_cfg, deps)
         evidence.append(EvidenceItem(
             id=_evidence_id("service_graph", str(deps)),
             kind="service_graph",
@@ -406,7 +410,7 @@ def _add_kb_evidence_items(evidence: List[EvidenceItem], subject_cfg: Dict[str, 
             query="kb.dependencies",
             summary="Service dependency graph from the knowledge base.",
             samples=[],
-            top_signals={"dependencies": deps},
+            top_signals={"dependencies": deps, "graph": graph},
             pointers=[],
             tags=["kb", "service_graph"],
         ))
@@ -428,6 +432,26 @@ def _add_kb_evidence_items(evidence: List[EvidenceItem], subject_cfg: Dict[str, 
 
     return evidence
 
+def _build_service_graph(subject_cfg: Dict[str, Any], deps: List[Dict[str, Any]]) -> Dict[str, Any]:
+    subject = subject_cfg.get("name", "subject")
+    nodes = [{"id": subject, "type": "service", "role": "primary"}]
+    edges = []
+    for d in deps:
+        name = d.get("name")
+        if not name:
+            continue
+        nodes.append({
+            "id": name,
+            "type": d.get("type", "dependency"),
+            "role": d.get("role"),
+        })
+        edges.append({
+            "from": subject,
+            "to": name,
+            "relation": d.get("relation", "depends_on"),
+        })
+    return {"nodes": nodes, "edges": edges}
+
 def _safe_json(text: str) -> Dict[str, Any]:
     try:
         parsed = json.loads(text)
@@ -445,6 +469,8 @@ def _available_tools(subject_cfg: Dict[str, Any]) -> List[str]:
     bindings = subject_cfg.get("bindings", {})
     if bindings.get("log_store"):
         tools.append("query_logs")
+    if bindings.get("alerting"):
+        tools.append("list_alerts")
     if bindings.get("runtime"):
         tools.append("query_k8s_logs")
         tools.append("list_k8s_events")
@@ -465,20 +491,22 @@ def _available_tools(subject_cfg: Dict[str, Any]) -> List[str]:
 def _missing_evidence_kinds(available_tools: List[str], evidence: List[EvidenceItem]) -> List[str]:
     kinds = {e.kind for e in evidence}
     missing = []
-    if "query_logs" in available_tools and "logs" not in kinds:
-        missing.append("logs")
-    if "query_k8s_logs" in available_tools and "logs" not in kinds:
-        missing.append("logs")
+    if "query_logs" in available_tools and "log" not in kinds:
+        missing.append("log")
+    if "query_k8s_logs" in available_tools and "log" not in kinds:
+        missing.append("log")
+    if "list_alerts" in available_tools and "alert" not in kinds:
+        missing.append("alert")
     if "list_k8s_events" in available_tools and "event" not in kinds:
         missing.append("event")
-    if "list_deployments" in available_tools and "deploy" not in kinds:
-        missing.append("deploy")
+    if "list_deployments" in available_tools and "deployment" not in kinds:
+        missing.append("deployment")
     if "list_builds" in available_tools and "build" not in kinds:
         missing.append("build")
     if "list_changes" in available_tools and "change" not in kinds:
         missing.append("change")
-    if "query_metrics" in available_tools and "metrics" not in kinds:
-        missing.append("metrics")
+    if "query_metrics" in available_tools and "metric" not in kinds:
+        missing.append("metric")
     if "query_traces" in available_tools and "trace" not in kinds:
         missing.append("trace")
     return missing
@@ -486,20 +514,22 @@ def _missing_evidence_kinds(available_tools: List[str], evidence: List[EvidenceI
 def _fallback_plan(available_tools: List[str], missing: List[str]) -> List[Dict[str, Any]]:
     plan: List[Dict[str, Any]] = []
     if "query_logs" in available_tools:
-        if "logs" in missing or not missing:
+        if "log" in missing or not missing:
             plan.append({"tool": "query_logs", "args": {"intent": "signature_counts", "limit": 200}})
             plan.append({"tool": "query_logs", "args": {"intent": "samples", "limit": 80}})
-    if "query_k8s_logs" in available_tools and ("logs" in missing or not missing):
+    if "list_alerts" in available_tools and ("alert" in missing or not missing):
+        plan.append({"tool": "list_alerts", "args": {"limit": 50}})
+    if "query_k8s_logs" in available_tools and ("log" in missing or not missing):
         plan.append({"tool": "query_k8s_logs", "args": {"limit": 120}})
     if "list_k8s_events" in available_tools and ("event" in missing or not missing):
         plan.append({"tool": "list_k8s_events", "args": {"limit": 200}})
-    if "list_deployments" in available_tools and "deploy" in missing:
+    if "list_deployments" in available_tools and "deployment" in missing:
         plan.append({"tool": "list_deployments", "args": {"window_minutes_before": 30, "window_minutes_after": 30, "limit": 20}})
     if "list_builds" in available_tools and "build" in missing:
         plan.append({"tool": "list_builds", "args": {"window_minutes_before": 60, "window_minutes_after": 60, "limit": 20}})
     if "list_changes" in available_tools and "change" in missing:
         plan.append({"tool": "list_changes", "args": {"window_minutes_before": 360, "include_prs": True, "include_commits": False, "limit": 30}})
-    if "query_metrics" in available_tools and "metrics" in missing:
+    if "query_metrics" in available_tools and "metric" in missing:
         plan.append({"tool": "query_metrics", "args": {"query": "up", "step_seconds": 60, "limit": 50}})
     if "query_traces" in available_tools and "trace" in missing:
         plan.append({"tool": "query_traces", "args": {"limit": 20}})
@@ -539,6 +569,21 @@ def _tool_schemas(subject_cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
                         "selector": {"type": "string"},
                         "container": {"type": "string"},
                         "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+                    },
+                },
+            },
+        })
+    if bindings.get("alerting"):
+        tools.append({
+            "type": "function",
+            "function": {
+                "name": "list_alerts",
+                "description": "List active alerts from the alerting system.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "label_filters": {"type": "array", "items": {"type": "string"}},
+                        "limit": {"type": "integer"},
                     },
                 },
             },
@@ -675,6 +720,8 @@ def _execute_tool_call(tool: str, args: Dict[str, Any], incident: IncidentInput,
         return _call_query_logs(args, incident, subject_cfg, registry)
     if tool == "query_k8s_logs":
         return _call_query_k8s_logs(args, incident, subject_cfg, registry)
+    if tool == "list_alerts":
+        return _call_list_alerts(args, incident, subject_cfg, registry)
     if tool == "list_k8s_events":
         return _call_list_k8s_events(args, incident, subject_cfg, registry)
     if tool == "list_deployments":
@@ -697,11 +744,11 @@ def _maybe_fetch_deploy_metadata(evidence: List[EvidenceItem], subject_cfg: Dict
     deploy_id = subject_cfg.get("bindings", {}).get("deploy_tracker")
     if not deploy_id:
         return evidence
-    if any(e.kind == "deploy" and "metadata" in (e.tags or []) for e in evidence):
+    if any(e.kind == "deployment" and "metadata" in (e.tags or []) for e in evidence):
         return evidence
     refs: List[str] = []
     for e in evidence:
-        if e.kind != "deploy":
+        if e.kind != "deployment":
             continue
         refs = (e.top_signals or {}).get("deployment_refs") or []
         if refs:
@@ -778,6 +825,20 @@ def _call_query_k8s_logs(args: Dict[str, Any], incident: IncidentInput, subject_
         limit=int(args.get("limit") or 200),
     )
     return runtime.get_logs(req)
+
+def _call_list_alerts(args: Dict[str, Any], incident: IncidentInput, subject_cfg: Dict[str, Any], registry):
+    alert_id = subject_cfg["bindings"].get("alerting")
+    if not alert_id:
+        return None
+    provider = registry.get(alert_id)
+    filters = args.get("label_filters") or []
+    req = AlertQueryRequest(
+        subject=incident.subject,
+        environment=incident.environment,
+        time_range=incident.time_range,
+        label_filters=filters,
+    )
+    return provider.list_alerts(req)
 
 def _call_list_k8s_events(args: Dict[str, Any], incident: IncidentInput, subject_cfg: Dict[str, Any], registry):
     runtime_id = subject_cfg["bindings"].get("runtime")
@@ -903,7 +964,7 @@ def _derive_what_changed(evidence: List[EvidenceItem]) -> Dict[str, Any]:
     builds = []
     changes = []
     for e in evidence:
-        if e.kind == "deploy":
+        if e.kind == "deployment":
             deploys.append(e.top_signals)
         elif e.kind == "build":
             builds.append(e.top_signals)
@@ -918,7 +979,7 @@ def _derive_what_changed(evidence: List[EvidenceItem]) -> Dict[str, Any]:
 def _derive_impact_scope(evidence: List[EvidenceItem]) -> Dict[str, Any]:
     impact: Dict[str, Any] = {"error_signatures": [], "event_reasons": [], "trace_ids": []}
     for e in evidence:
-        if e.kind == "logs":
+        if e.kind == "log":
             sigs = (e.top_signals or {}).get("signatures") or []
             impact["error_signatures"].extend(sigs)
         if e.kind == "event":
@@ -928,6 +989,21 @@ def _derive_impact_scope(evidence: List[EvidenceItem]) -> Dict[str, Any]:
             trace_ids = (e.top_signals or {}).get("trace_ids") or []
             impact["trace_ids"].extend(trace_ids)
     return impact
+
+def _format_supporting_evidence(top: Hypothesis, evidence: List[EvidenceItem]) -> List[str]:
+    ev = {e.id: e for e in evidence}
+    out: List[str] = []
+    for eid in top.supporting_evidence_ids:
+        e = ev.get(eid)
+        if not e:
+            continue
+        pointers = e.pointers or []
+        if pointers:
+            refs = "; ".join(f"{p.get('title', 'link')}: {p.get('url', '')}" for p in pointers)
+            out.append(f"- [{e.kind}] {e.summary} ({refs})")
+        else:
+            out.append(f"- [{e.kind}] {e.summary}")
+    return out
 
 
 GRAPH = build_graph()

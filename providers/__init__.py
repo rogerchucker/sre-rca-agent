@@ -9,6 +9,7 @@ from providers.runtime.kubectl import KubectlRuntime
 from providers.metrics_store.prometheus import PrometheusMetricsStore
 from providers.trace_store.jaeger import JaegerTraceStore
 from providers.build_tracker.github_actions_builds import GitHubActionsBuildTracker
+from providers.alerting.grafana import GrafanaAlerting
 
 def _factory(cls):
     def create(provider_id: str, config: Dict[str, Any]):
@@ -24,4 +25,5 @@ FACTORIES = {
     "metrics_store:prometheus": _factory(PrometheusMetricsStore),
     "trace_store:jaeger": _factory(JaegerTraceStore),
     "build_tracker:github_actions": _factory(GitHubActionsBuildTracker),
+    "alerting:grafana": _factory(GrafanaAlerting),
 }

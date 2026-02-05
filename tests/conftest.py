@@ -15,9 +15,27 @@ if str(ROOT) not in sys.path:
 def _set_env(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("LOG_STORE_URL", "https://loki.example.invalid")
+    monkeypatch.setenv("METRICS_URL", "https://prom.example.invalid")
+    monkeypatch.setenv("TRACE_URL", "https://jaeger.example.invalid")
+    monkeypatch.setenv("GRAFANA_URL", "https://grafana.example.invalid")
+    monkeypatch.setenv("GRAFANA_TOKEN", "test-grafana")
+    monkeypatch.setenv("GRAFANA_USER", "grafana-user")
     monkeypatch.setenv("VCS_TOKEN", "test-vcs")
     monkeypatch.setenv("DEPLOY_TOKEN", "test-deploy")
     monkeypatch.setenv("BUILD_TOKEN", "test-build")
+    monkeypatch.setenv("ENABLE_PERSISTENCE", "false")
+    monkeypatch.setenv("DATABASE_URL", "")
+
+    # Sync settings object with test env without reloading ORM models.
+    import importlib
+    import core.config
+    import core.orchestrator
+
+    core.config.settings.openai_api_key = "test-key"
+    core.config.settings.enable_persistence = False
+    core.config.settings.database_url = None
+
+    importlib.reload(core.orchestrator)
 
 
 @pytest.fixture

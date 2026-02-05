@@ -9,6 +9,7 @@ from core.models import (
     BuildQueryRequest,
     MetricsQueryRequest,
     TraceQueryRequest,
+    AlertQueryRequest,
     EventQueryRequest,
     K8sLogQueryRequest,
 )
@@ -34,6 +35,9 @@ class MetricsStoreProvider(Protocol):
 
 class TraceStoreProvider(Protocol):
     def search_traces(self, req: TraceQueryRequest) -> EvidenceItem: ...
+
+class AlertingProvider(Protocol):
+    def list_alerts(self, req: AlertQueryRequest) -> EvidenceItem: ...
 
 class RuntimeProvider(Protocol):
     def get_logs(self, req: K8sLogQueryRequest) -> EvidenceItem: ...

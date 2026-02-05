@@ -31,17 +31,20 @@ class GitHubActionsDeployTracker:
 
     def list_deployments(self, req: DeployQueryRequest) -> EvidenceItem:
         repo = self._resolve_repo(req.subject)
-        workflow_path = self._resolve_workflow(req.subject)
+        workflow_paths = self._resolve_workflows(req.subject)
         tr = req.time_range
+        branch_allowlist = self.config.get("branch_allowlist") or []
 
-        runs = self._list_runs(repo, workflow_path, tr, limit=req.limit)
+        runs = []
+        for workflow_path in workflow_paths:
+            runs.extend(self._list_runs(repo, workflow_path, tr, limit=req.limit, branch_allowlist=branch_allowlist))
 
         # Provide deployment refs as "run:<id>"
         refs = [f"run:{r['run_id']}" for r in runs]
 
         return EvidenceItem(
             id=_evidence_id("deploy_runs", repo + workflow_path + tr.start + tr.end),
-            kind="deploy",
+            kind="deployment",
             source=self.provider_id,
             time_range=tr,
             query=f"deploy_runs:{workflow_path}",
@@ -66,7 +69,7 @@ class GitHubActionsDeployTracker:
 
         return EvidenceItem(
             id=_evidence_id("deploy_meta", repo + str(run_id)),
-            kind="deploy",
+            kind="deployment",
             source=self.provider_id,
             time_range=TimeRange(start="", end=""),
             query=f"deploy_run_logs:{run_id}",
@@ -85,11 +88,13 @@ class GitHubActionsDeployTracker:
             raise ValueError(f"Deploy tracker cannot resolve repo for subject '{subject}'. Provide repo_map.")
         return repo
 
-    def _resolve_workflow(self, subject: str) -> str:
+    def _resolve_workflows(self, subject: str) -> List[str]:
         wf = self.workflow_path_map.get(subject)
         if not wf:
             raise ValueError(f"Deploy tracker cannot resolve workflow path for subject '{subject}'. Provide workflow_path_map.")
-        return wf
+        if isinstance(wf, list):
+            return wf
+        return [wf]
 
     def _headers(self) -> Dict[str, str]:
         return {
@@ -99,7 +104,7 @@ class GitHubActionsDeployTracker:
             "User-Agent": "sre-rca-agent",
         }
 
-    def _list_runs(self, repo_full_name: str, workflow_path: str, tr: TimeRange, limit: int) -> List[Dict[str, Any]]:
+    def _list_runs(self, repo_full_name: str, workflow_path: str, tr: TimeRange, limit: int, branch_allowlist: List[str]) -> List[Dict[str, Any]]:
         owner, repo = repo_full_name.split("/", 1)
         url = f"{GITHUB_API}/repos/{owner}/{repo}/actions/workflows/{workflow_path}/runs"
 
@@ -118,6 +123,9 @@ class GitHubActionsDeployTracker:
             created = datetime.fromisoformat(run["created_at"].replace("Z", "+00:00"))
             if created < start_dt or created > end_dt:
                 continue
+            if branch_allowlist:
+                if run.get("head_branch") not in branch_allowlist:
+                    continue
             out.append({
                 "run_id": run["id"],
                 "created_at": run["created_at"],
@@ -125,6 +133,7 @@ class GitHubActionsDeployTracker:
                 "conclusion": run.get("conclusion"),
                 "url": run.get("html_url"),
                 "head_sha": run.get("head_sha"),
+                "head_branch": run.get("head_branch"),
             })
 
         # Sort by time desc, cap

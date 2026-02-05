@@ -11,6 +11,7 @@ The RCA report payload includes these top-level fields:
 - `other_hypotheses`
 - `fallback_hypotheses`
 - `evidence`
+- `supporting_evidence` (formatted bullets with pointers)
 - `what_changed` (deploys/builds/changes)
 - `impact_scope` (error signatures, event reasons, trace ids)
 - `next_validations`
@@ -55,6 +56,9 @@ The RCA report payload includes these top-level fields:
       "pointers": [],
       "tags": ["logs", "signatures"]
     }
+  ],
+  "supporting_evidence": [
+    "- [logs] Top error signatures computed over the time window."
   ],
   "what_changed": {
     "deployments": [{"deployment_refs": ["run:1"]}],

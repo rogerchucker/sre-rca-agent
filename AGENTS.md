@@ -16,6 +16,10 @@ Always review @OUTLINE.md to ensure the project is not deviating. If it is, call
 
 # Repository Guidelines
 
+## Rules for feature implementation
+-  After every UI-related task completion, verify the changes as well as if this change regressed on  the actual UI by using the Playwroght skills.
+- If something is broken, do not stop until you have fixed it.
+
 ## Project Structure & Module Organization
 - `api/`: FastAPI entrypoints (see `api/main.py`).
 - `core/`: RCA workflow, registry, prompts, scoring, and config.

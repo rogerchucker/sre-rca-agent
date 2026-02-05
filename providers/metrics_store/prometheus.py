@@ -38,7 +38,7 @@ class PrometheusMetricsStore:
 
         return EvidenceItem(
             id=_evidence_id("metrics", query + tr.start + tr.end),
-            kind="metrics",
+            kind="metric",
             source=self.provider_id,
             time_range=tr,
             query=query,
@@ -74,6 +74,13 @@ def _auth_headers(auth: Dict[str, Any]) -> Dict[str, str]:
         token_env = auth.get("token_env")
         if token_env and token_env in os.environ:
             return {"Authorization": f"Bearer {os.environ[token_env]}"}
+    if auth.get("kind") == "basic_env":
+        import base64
+        user_env = auth.get("username_env")
+        token_env = auth.get("token_env")
+        if user_env and token_env and user_env in os.environ and token_env in os.environ:
+            raw = f"{os.environ[user_env]}:{os.environ[token_env]}".encode("utf-8")
+            return {"Authorization": "Basic " + base64.b64encode(raw).decode("ascii")}
     return {}
 
 def _env_required(env_name: str | None) -> str:

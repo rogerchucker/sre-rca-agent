@@ -61,6 +61,7 @@ def test_score_and_report_fallback():
     assert "what_changed" in report
     assert "impact_scope" in report
     assert "fallback_hypotheses" in report
+    assert "supporting_evidence" in report
 
 
 def test_normalize_incident_skips_when_present():
@@ -118,7 +119,7 @@ def test_score_and_report_stops_when_confident():
     evidence = [
         EvidenceItem(
             id="e_logs",
-            kind="logs",
+            kind="log",
             source="s1",
             time_range=tr,
             query="q",
@@ -126,7 +127,7 @@ def test_score_and_report_stops_when_confident():
         ),
         EvidenceItem(
             id="e_deploy",
-            kind="deploy",
+            kind="deployment",
             source="s2",
             time_range=tr,
             query="q",
@@ -178,6 +179,8 @@ def test_score_and_report_stops_when_confident():
     out = score_and_report(state)
     assert out["should_iterate"] is False
     assert out["iteration"] == 1
+    report = out["report"]
+    assert any(line.startswith("- [") for line in report["supporting_evidence"])
 
 
 def test_summarize_evidence_adds_kb_items():
@@ -194,6 +197,7 @@ def test_summarize_evidence_adds_kb_items():
         },
         "kb_slice": {
             "subject_cfg": {
+                "name": "payments",
                 "dependencies": [{"name": "postgres", "role": "primary"}],
                 "runbooks": [{"title": "DB pool troubleshooting", "link": "https://example.invalid"}],
             }
@@ -205,3 +209,6 @@ def test_summarize_evidence_adds_kb_items():
     kinds = {e["kind"] for e in out["evidence"]}
     assert "service_graph" in kinds
     assert "runbook" in kinds
+    graph = next(e for e in out["evidence"] if e["kind"] == "service_graph")["top_signals"]["graph"]
+    assert graph["nodes"][0]["id"] == "payments"
+    assert graph["edges"][0]["to"] == "postgres"

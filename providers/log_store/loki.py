@@ -37,7 +37,7 @@ class LokiLogStore:
             lines = _extract_log_lines(payload, limit=limit)
             return EvidenceItem(
                 id=_evidence_id("logs_samples", logql + tr.start + tr.end),
-                kind="logs",
+                kind="log",
                 source=self.provider_id,
                 time_range=tr,
                 query=logql,
@@ -51,7 +51,7 @@ class LokiLogStore:
         sigs = _extract_signature_series(payload)
         return EvidenceItem(
             id=_evidence_id("logs_sigs", logql + tr.start + tr.end),
-            kind="logs",
+                kind="log",
             source=self.provider_id,
             time_range=tr,
             query=logql,
@@ -154,6 +154,15 @@ class LokiLogStore:
         if kind == "bearer_env":
             token = _env_required((self.auth or {}).get("token_env"))
             return {"Authorization": f"Bearer {token}"}
+        if kind == "basic_env":
+            import base64
+            user_env = (self.auth or {}).get("username_env")
+            token_env = (self.auth or {}).get("token_env")
+            if user_env and token_env:
+                user = _env_required(user_env)
+                token = _env_required(token_env)
+                raw = f"{user}:{token}".encode("utf-8")
+                return {"Authorization": f"Basic {base64.b64encode(raw).decode('ascii')}"}
         return {}
 
     def _query_range(self, logql: str, tr: TimeRange, limit: int) -> Dict[str, Any]:

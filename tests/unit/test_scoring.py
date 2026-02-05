@@ -19,8 +19,8 @@ def _evidence(eid: str, kind: str) -> EvidenceItem:
 
 def test_score_hypothesis_coverage_and_contradictions():
     evidence = [
-        _evidence("e1", "logs"),
-        _evidence("e2", "deploy"),
+        _evidence("e1", "log"),
+        _evidence("e2", "deployment"),
         _evidence("e3", "change"),
     ]
     h = Hypothesis(
@@ -50,7 +50,7 @@ def test_score_hypothesis_coverage_and_contradictions():
 
 
 def test_rank_sorts_by_confidence():
-    evidence = [_evidence("e1", "logs")]
+    evidence = [_evidence("e1", "log")]
     h1 = Hypothesis(
         id="h1",
         statement="Short",

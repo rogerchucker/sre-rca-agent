@@ -14,6 +14,10 @@ dependencies = [
   "httpx>=0.27",
   "langgraph>=0.2.0",
   "openai>=1.40.0",
+  "jinja2>=3.1.6",
+  "sqlalchemy>=2.0",
+  "psycopg[binary]>=3.2",
+  "psycopg2>=2.9.11",
 ]
 
 [project.optional-dependencies]
@@ -27,3 +31,8 @@ minversion = "8.2"
 testpaths = ["tests"]
 addopts = "-q"
 asyncio_mode = "auto"
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.0.0",
+]

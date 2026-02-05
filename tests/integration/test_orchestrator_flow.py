@@ -13,7 +13,7 @@ class StubLogProvider:
     def query(self, req):
         return EvidenceItem(
             id="logs_1",
-            kind="logs",
+            kind="log",
             source=self.provider_id,
             time_range=req.time_range,
             query="q",
@@ -32,7 +32,7 @@ class StubDeployProvider:
     def list_deployments(self, req):
         return EvidenceItem(
             id="deploy_1",
-            kind="deploy",
+            kind="deployment",
             source=self.provider_id,
             time_range=req.time_range,
             query="q",
@@ -46,7 +46,7 @@ class StubDeployProvider:
     def get_deployment_metadata(self, deployment_ref: str):
         return EvidenceItem(
             id="deploy_meta_1",
-            kind="deploy",
+            kind="deployment",
             source=self.provider_id,
             time_range=TimeRange(start="", end=""),
             query="q",
@@ -122,6 +122,7 @@ class FakeClient:
 
 def test_orchestrator_run_end_to_end(monkeypatch, kb_path, webhook_payload):
     monkeypatch.setattr(orchestrator.settings, "kb_path", kb_path)
+    monkeypatch.setattr(orchestrator.settings, "catalog_path", kb_path)
 
     # Stub provider factories
     def _factory(cls):

@@ -35,7 +35,7 @@ class KubectlRuntime:
         if not ns or not selector:
             return EvidenceItem(
                 id=_evidence_id("k8s_logs_missing", req.subject + tr.start + tr.end),
-                kind="logs",
+                kind="log",
                 source=self.provider_id,
                 time_range=tr,
                 query="kubectl logs (missing namespace/selector)",
@@ -58,7 +58,7 @@ class KubectlRuntime:
 
         return EvidenceItem(
             id=_evidence_id("k8s_logs", selector + tr.start + tr.end),
-            kind="logs",
+            kind="log",
             source=self.provider_id,
             time_range=tr,
             query=" ".join(cmd),

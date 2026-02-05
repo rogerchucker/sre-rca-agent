@@ -1,0 +1,63 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: Operations Portal
+        - generic [ref=e8]: Agentic SRE Control Plane
+        - generic [ref=e9]: Live Mode
+      - navigation [ref=e10]:
+        - link "Overview" [ref=e11] [cursor=pointer]:
+          - /url: /
+        - link "Systems Access" [ref=e12] [cursor=pointer]:
+          - /url: /systems
+        - link "Knowledge Base" [ref=e13] [cursor=pointer]:
+          - /url: /knowledge
+      - generic [ref=e14]:
+        - text: "Trust: human approval required"
+        - text: "Env: prod / staging"
+        - text: "Access: read-only by default"
+    - main [ref=e16]:
+      - generic [ref=e165]:
+        - generic [ref=e166]:
+          - generic [ref=e167]:
+            - generic [ref=e168]:
+              - generic [ref=e169]: Knowledge base
+              - generic [ref=e170]: Runbooks & playbooks
+            - generic [ref=e171]:
+              - text: Filter by subject
+              - combobox "Filter by subject" [ref=e172]:
+                - option "All" [selected]
+                - option "hn-backend-demo"
+          - generic [ref=e173]:
+            - generic [ref=e174]:
+              - generic [ref=e175]: Runbooks
+              - generic [ref=e176]:
+                - generic [ref=e177]:
+                  - generic [ref=e178]: rbk-hn-backend-demo-deploy_regression
+                  - generic [ref=e179]: "Subject: hn-backend-demo"
+                - generic [ref=e180]:
+                  - generic [ref=e181]: rbk-hn-backend-demo-import_error
+                  - generic [ref=e182]: "Subject: hn-backend-demo"
+            - generic [ref=e183]:
+              - generic [ref=e184]: Playbooks
+              - generic [ref=e185]:
+                - generic [ref=e186]:
+                  - generic [ref=e187]: deploy_regression
+                  - generic [ref=e188]: "Subject: hn-backend-demo"
+                - generic [ref=e189]:
+                  - generic [ref=e190]: import_error
+                  - generic [ref=e191]: "Subject: hn-backend-demo"
+        - generic [ref=e192]:
+          - generic [ref=e193]: Coverage
+          - generic [ref=e194]: Knowledge base inventory
+          - generic [ref=e195]:
+            - generic [ref=e196]:
+              - generic [ref=e197]: Subjects onboarded
+              - generic [ref=e198]: "1"
+            - generic [ref=e199]:
+              - generic [ref=e200]: Runbooks
+              - generic [ref=e201]: "2"
+            - generic [ref=e202]:
+              - generic [ref=e203]: Playbooks
+              - generic [ref=e204]: "2"
+  - generic [ref=e56]: untitled page
