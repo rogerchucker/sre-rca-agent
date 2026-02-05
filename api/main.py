@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import desc, func, select
 from pydantic import BaseModel, Field, field_validator
 
@@ -20,8 +21,46 @@ from core.db import get_db
 from core.persistence_models import ActionExecution, AuditEvent, EvidenceItem, Incident, IncidentReport
 from core.kb import KB
 from core.config import settings
+from api.copilotkit_agent import add_copilotkit_endpoint
 
-app = FastAPI(title="RCA Investigation Agent")
+app = FastAPI(
+    title="RCA Investigation Agent",
+    description="""
+AI-powered Root Cause Analysis for Incident Investigation.
+
+## Features
+
+- **Incident Investigation**: Analyze incidents using evidence from logs, deployments, and code changes
+- **Hypothesis Generation**: Generate and rank root cause hypotheses with confidence scores
+- **Knowledge Base**: Leverage organizational knowledge for context-aware analysis
+- **CopilotKit Integration**: Conversational AI interface for interactive investigations
+
+## Authentication
+
+This API does not require authentication by default. For production deployments,
+implement appropriate authentication middleware.
+    """,
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT",
+    },
+)
+
+# CORS middleware for Next.js frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# CopilotKit/AG-UI endpoint for RCA agent
+add_copilotkit_endpoint(app)
 LAST_REPORT: Optional[RCAReport] = None
 
 

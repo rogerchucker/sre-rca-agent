@@ -143,3 +143,7 @@ class AgentState(BaseModel):
     plan: List[Dict[str, Any]] = Field(default_factory=list)
     iteration: int = 0
     report: Optional[RCAReport] = None
+    # UI progress tracking fields for CopilotKit
+    current_step: str = ""
+    progress_message: str = ""
+    progress_percent: int = 0

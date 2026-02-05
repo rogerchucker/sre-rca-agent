@@ -69,6 +69,9 @@ def normalize_incident(state: Dict[str, Any]) -> Dict[str, Any]:
     Accepts a webhook payload and maps it into a vendor-neutral IncidentInput.
     This parser is intentionally tolerant and does not assume a specific alerting product.
     """
+    state["current_step"] = "normalize_incident"
+    state["progress_message"] = "Parsing incident data..."
+    state["progress_percent"] = 5
     if state.get("incident"):
         return state
     raw = state.get("raw_webhook", {})
@@ -113,6 +116,9 @@ def load_kb_slice(state: Dict[str, Any]) -> Dict[str, Any]:
     from core.registry import ProviderRegistry
     from providers import FACTORIES  # mapping lives outside core logic
 
+    state["current_step"] = "load_kb_slice"
+    state["progress_message"] = "Loading knowledge base..."
+    state["progress_percent"] = 10
     incident = IncidentInput(**state["incident"])
     kb = KB.load(settings.kb_path)
 
@@ -130,6 +136,9 @@ def load_kb_slice(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
 
 def seed_alert_evidence(state: Dict[str, Any]) -> Dict[str, Any]:
+    state["current_step"] = "seed_alert_evidence"
+    state["progress_message"] = "Capturing initial alert evidence..."
+    state["progress_percent"] = 15
     incident = IncidentInput(**state["incident"])
     e = EvidenceItem(
         id="alert_0",
@@ -147,6 +156,9 @@ def seed_alert_evidence(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
 
 def plan_evidence(state: Dict[str, Any]) -> Dict[str, Any]:
+    state["current_step"] = "plan_evidence"
+    state["progress_message"] = "Planning evidence collection strategy..."
+    state["progress_percent"] = 25
     incident = IncidentInput(**state["incident"])
     subject_cfg = state["kb_slice"]["subject_cfg"]
     evidence = [EvidenceItem(**x) for x in state.get("evidence", [])]
@@ -188,6 +200,9 @@ def plan_evidence(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
 
 def collect_evidence_tools(state: Dict[str, Any]) -> Dict[str, Any]:
+    state["current_step"] = "collect_evidence"
+    state["progress_message"] = "Collecting evidence from telemetry sources..."
+    state["progress_percent"] = 40
     incident = IncidentInput(**state["incident"])
     subject_cfg = state["kb_slice"]["subject_cfg"]
     registry = state["_registry"]
@@ -240,6 +255,9 @@ def collect_evidence_tools(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
 
 def summarize_evidence(state: Dict[str, Any]) -> Dict[str, Any]:
+    state["current_step"] = "summarize_evidence"
+    state["progress_message"] = "Summarizing collected evidence..."
+    state["progress_percent"] = 60
     incident = IncidentInput(**state["incident"])
     subject_cfg = state["kb_slice"]["subject_cfg"]
     evidence = [EvidenceItem(**x) for x in state.get("evidence", [])]
@@ -250,6 +268,9 @@ def summarize_evidence(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
 
 def hypothesize(state: Dict[str, Any]) -> Dict[str, Any]:
+    state["current_step"] = "hypothesize"
+    state["progress_message"] = "Generating root cause hypotheses..."
+    state["progress_percent"] = 75
     incident = IncidentInput(**state["incident"])
     evidence = [EvidenceItem(**x) for x in state.get("evidence", [])]
     subject_cfg = state["kb_slice"]["subject_cfg"]
@@ -338,6 +359,9 @@ def hypothesize(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
 
 def score_and_report(state: Dict[str, Any]) -> Dict[str, Any]:
+    state["current_step"] = "score_and_report"
+    state["progress_message"] = "Scoring hypotheses and generating report..."
+    state["progress_percent"] = 90
     incident = IncidentInput(**state["incident"])
     evidence = [EvidenceItem(**x) for x in state.get("evidence", [])]
     hyps = [Hypothesis(**x) for x in state.get("hypotheses", [])]
@@ -382,7 +406,13 @@ def score_and_report(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
 
 def decide_next(state: Dict[str, Any]) -> str:
-    return "iterate" if state.get("should_iterate") else "end"
+    if state.get("should_iterate"):
+        state["progress_message"] = "Confidence below threshold, collecting more evidence..."
+        return "iterate"
+    state["current_step"] = "complete"
+    state["progress_message"] = "Investigation complete"
+    state["progress_percent"] = 100
+    return "end"
 
 
 def _compact_evidence(evidence: List[EvidenceItem]) -> List[Dict[str, Any]]:

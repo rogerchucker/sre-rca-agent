@@ -18,12 +18,16 @@ dependencies = [
   "sqlalchemy>=2.0",
   "psycopg[binary]>=3.2",
   "psycopg2>=2.9.11",
+  "copilotkit>=0.1.77",
+  "ag-ui-langgraph>=0.0.10",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.2",
   "pytest-asyncio>=0.23",
+  "pytest-cov>=7.0.0",
+  "ruff>=0.8.0",
 ]
 
 [tool.pytest.ini_options]
@@ -34,5 +38,8 @@ asyncio_mode = "auto"
 
 [dependency-groups]
 dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
     "pytest-cov>=7.0.0",
+    "ruff>=0.8.0",
 ]

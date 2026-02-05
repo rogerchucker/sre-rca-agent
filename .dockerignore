@@ -1,0 +1,64 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+ENV
+env
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+.tox
+.nox
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Frontend (handled by frontend/Dockerfile)
+frontend/node_modules
+frontend/.next
+frontend/out
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests
+tests/
+
+# Development files
+CLAUDE.md
+AGENTS.md
+TRACKER.md
+go-live-tracker.md
