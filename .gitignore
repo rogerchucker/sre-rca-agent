@@ -48,6 +48,9 @@ package-lock.json
 # Old KB examples not used by the app (use kb/seeds or tests/fixtures)
 kb/example*.yaml
 
+# Internal prompt scratchpads
+docs/ui-prompts*.md
+
 # Backups created by onboarding apply
 catalog/*.before-template.*
 catalog/*.bak.*
