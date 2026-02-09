@@ -1,0 +1,51 @@
+version: 1
+subjects:
+  - name: hn-backend-demo
+    environment: prod
+    aliases:
+      - hn-backend
+      - hn-feed-backend
+    bindings:
+      log_store: log_store_1
+      deploy_tracker: deploy_1
+      vcs: vcs_1
+      metrics_store: metrics_1
+      trace_store: trace_1
+      alerting: alerting_1
+    log_evidence:
+      stream_selectors:
+        job: hn-backend-demo
+        level: ERROR
+        Exporter: OTLP
+      parse:
+        format: json
+        fields:
+          env: resources.deployment.environment
+          version: resources.service.version
+          err_type: attributes.error.type
+          err_msg: attributes.error.message
+          route: attributes.http.route
+          status: attributes.http.status_code
+          trace_id: attributes.otelTraceID
+      default_filters:
+        environment: prod
+      evidence_intents:
+        - signature_counts
+        - samples
+    deploy_context:
+      repo: rogerchucker/hn-feed
+      workflow_path: .github/workflows/deploy.yml
+      branch: demo
+    vcs_context:
+      repo: rogerchucker/hn-feed
+      branch: demo
+    known_failure_modes:
+      - name: deploy_regression
+        indicators:
+          - new error signature after deploy
+      - name: import_error
+        indicators:
+          - ImportError
+          - cannot import name
+    dependencies: []
+    runbooks: []

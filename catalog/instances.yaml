@@ -1,0 +1,56 @@
+version: 1
+providers:
+  - id: logs_primary
+    category: log_store
+    type: generic_log_api
+    capabilities:
+      operations:
+        - query.signature_counts
+        - query.samples
+    config:
+      base_url_env: LOG_STORE_URL
+      token_env: LOG_STORE_TOKEN
+  - id: metrics_primary
+    category: metrics_store
+    type: generic_metrics_api
+    capabilities:
+      operations:
+        - query_range
+    config:
+      base_url_env: METRICS_URL
+      token_env: METRICS_TOKEN
+  - id: traces_primary
+    category: trace_store
+    type: generic_trace_api
+    capabilities:
+      operations:
+        - search_traces
+    config:
+      base_url_env: TRACE_URL
+      token_env: TRACE_TOKEN
+  - id: vcs_primary
+    category: vcs
+    type: generic_vcs_api
+    capabilities:
+      operations:
+        - list_changes
+    config:
+      token_env: VCS_TOKEN
+  - id: deploy_primary
+    category: deploy_tracker
+    type: generic_deploy_api
+    capabilities:
+      operations:
+        - list_deployments
+        - get_deployment_metadata
+    config:
+      token_env: DEPLOY_TOKEN
+  - id: alerts_primary
+    category: alerting
+    type: generic_alerts_api
+    capabilities:
+      operations:
+        - list_alerts
+    config:
+      base_url_env: ALERTS_URL
+      token_env: ALERTS_TOKEN

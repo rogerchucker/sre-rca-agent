@@ -1,0 +1,582 @@
+schema_version: "rca.tools.v1"
+
+tool_catalog:
+  tools:
+    # -------------------------
+    # Incident intake / paging
+    # -------------------------
+    - tool_id: "incident_mgmt.pagerduty"
+      display_name: "Incident Management"
+      tool_kind: "incident_mgmt"
+      vendor: { name: "PagerDuty", product: "PagerDuty" }
+      capabilities:
+        read:
+          - type: "incidents"
+            operations: ["list", "get", "timeline"]
+          - type: "oncall"
+            operations: ["get_schedule"]
+        write:
+          - type: "incidents"
+            operations: ["create", "update_status", "add_note", "add_responder"]
+      connection:
+        transport: "https"
+        base_url: "${PAGERDUTY_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "PAGERDUTY_TOKEN" }
+      mappings:
+        incident_fields:
+          title: "title"
+          status: "status"
+          severity: "urgency_or_severity"
+          started_at: "created_at"
+          resolved_at: "resolved_at"
+      policies:
+        audit: { emit_evidence_for_all_writes: true }
+
+    # -------------------------
+    # Observability (metrics/logs/traces/errors)
+    # -------------------------
+    - tool_id: "observability.datadog"
+      display_name: "Observability"
+      tool_kind: "observability"
+      vendor: { name: "Datadog", product: "Datadog" }
+      capabilities:
+        read:
+          - type: "metrics"
+            operations: ["timeseries_query", "topk", "anomaly_summary"]
+          - type: "logs"
+            operations: ["search", "tail", "aggregate"]
+          - type: "traces"
+            operations: ["search", "trace_by_id", "span_aggregate"]
+          - type: "dashboards"
+            operations: ["list", "snapshot"]
+          - type: "alerts"
+            operations: ["list", "get", "ack_status"]
+        write:
+          - type: "annotations"
+            operations: ["create"]
+          - type: "alert_actions"
+            operations: ["acknowledge", "silence", "resolve"]
+      connection:
+        transport: "https"
+        base_url: "${DATADOG_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "DATADOG_API_KEY" }
+      mappings:
+        identity:
+          service_name_field: "service"
+          environment_field: "env"
+          trace_id_field: "trace_id"
+          request_id_field: "request_id"
+      policies:
+        data_access:
+          allowed_environments: ["prod", "staging"]
+          pii_handling: "redact"
+        action_safety:
+          requires_approval_for: ["silence_alerts", "resolve_alerts"]
+          approval_roles: ["incident_commander", "oncall-primary"]
+        audit:
+          emit_evidence_for_all_reads: true
+          emit_evidence_for_all_writes: true
+
+    - tool_id: "observability.newrelic"
+      display_name: "Observability"
+      tool_kind: "observability"
+      vendor: { name: "New Relic", product: "New Relic" }
+      capabilities:
+        read:
+          - type: "metrics"
+            operations: ["timeseries_query", "topk"]
+          - type: "logs"
+            operations: ["search", "aggregate"]
+          - type: "traces"
+            operations: ["search", "trace_by_id"]
+          - type: "alerts"
+            operations: ["list", "get"]
+      connection:
+        transport: "https"
+        base_url: "${NEWRELIC_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "NEWRELIC_API_KEY" }
+      policies:
+        data_access:
+          allowed_environments: ["prod", "staging"]
+          pii_handling: "redact"
+        audit:
+          emit_evidence_for_all_reads: true
+
+    - tool_id: "observability.honeycomb"
+      display_name: "Observability"
+      tool_kind: "observability"
+      vendor: { name: "Honeycomb", product: "Honeycomb" }
+      capabilities:
+        read:
+          - type: "traces"
+            operations: ["search", "trace_by_id", "span_aggregate"]
+          - type: "datasets"
+            operations: ["list"]
+      connection:
+        transport: "https"
+        base_url: "${HONEYCOMB_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "HONEYCOMB_API_KEY" }
+      policies:
+        pii_handling: "redact"
+        audit:
+          emit_evidence_for_all_reads: true
+
+    - tool_id: "logs.axiom"
+      display_name: "Log Analytics"
+      tool_kind: "observability"
+      vendor: { name: "Axiom", product: "Axiom" }
+      capabilities:
+        read:
+          - type: "logs"
+            operations: ["search", "aggregate"]
+      connection:
+        transport: "https"
+        base_url: "${AXIOM_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "AXIOM_TOKEN" }
+      policies:
+        pii_handling: "redact"
+        audit:
+          emit_evidence_for_all_reads: true
+
+    - tool_id: "errors.sentry"
+      display_name: "Error Monitoring"
+      tool_kind: "observability"
+      vendor: { name: "Sentry", product: "Sentry" }
+      capabilities:
+        read:
+          - type: "error_events"
+            operations: ["list_issues", "get_issue", "list_events", "get_event"]
+      connection:
+        transport: "https"
+        base_url: "${SENTRY_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "SENTRY_TOKEN" }
+      mappings:
+        identity:
+          service_name_field: "project_or_service"
+          environment_field: "environment"
+      policies:
+        pii_handling: "redact"
+        audit:
+          emit_evidence_for_all_reads: true
+
+    - tool_id: "replay.logrocket"
+      display_name: "Session Replay"
+      tool_kind: "observability"
+      vendor: { name: "LogRocket", product: "LogRocket" }
+      capabilities:
+        read:
+          - type: "sessions"
+            operations: ["search", "get_session"]
+      connection:
+        transport: "https"
+        base_url: "${LOGROCKET_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "LOGROCKET_TOKEN" }
+      policies:
+        data_access:
+          allowed_environments: ["prod"]
+          pii_handling: "redact"
+
+    - tool_id: "errors.highlight"
+      display_name: "Error Monitoring"
+      tool_kind: "observability"
+      vendor: { name: "Highlight", product: "Highlight" }
+      capabilities:
+        read:
+          - type: "error_events"
+            operations: ["list", "get"]
+          - type: "sessions"
+            operations: ["search", "get_session"]
+      connection:
+        transport: "https"
+        base_url: "${HIGHLIGHT_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "HIGHLIGHT_TOKEN" }
+      policies:
+        pii_handling: "redact"
+
+    # -------------------------
+    # CI/CD (source of deployment truth)
+    # -------------------------
+    - tool_id: "cicd.github_actions"
+      display_name: "CI/CD"
+      tool_kind: "cicd"
+      vendor: { name: "GitHub", product: "GitHub Actions" }
+      capabilities:
+        read:
+          - type: "pipelines"
+            operations: ["list_runs", "get_run", "get_run_logs"]
+          - type: "deployments"
+            operations: ["list", "get", "diff"]
+        write:
+          - type: "deployments"
+            operations: ["trigger", "rollback"]
+      connection:
+        transport: "https"
+        base_url: "${GITHUB_API_BASE_URL}"
+        auth: { scheme: "oauth2", token_env: "GITHUB_TOKEN" }
+      mappings:
+        deployment_ref:
+          canonical_format: "run:{repo_full_name}:{run_id}"
+      policies:
+        action_safety:
+          requires_approval_for: ["trigger_deploy", "rollback"]
+          approval_roles: ["incident_commander", "release_manager"]
+
+    - tool_id: "cicd.gitlab_ci"
+      display_name: "CI/CD"
+      tool_kind: "cicd"
+      vendor: { name: "GitLab", product: "GitLab CI" }
+      capabilities:
+        read:
+          - type: "pipelines"
+            operations: ["list_runs", "get_run", "get_run_logs"]
+          - type: "deployments"
+            operations: ["list", "get", "diff"]
+        write:
+          - type: "deployments"
+            operations: ["trigger", "rollback"]
+      connection:
+        transport: "https"
+        base_url: "${GITLAB_API_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "GITLAB_TOKEN" }
+      mappings:
+        deployment_ref:
+          canonical_format: "pipeline:{project_path}:{pipeline_id}"
+      policies:
+        action_safety:
+          requires_approval_for: ["trigger_deploy", "rollback"]
+          approval_roles: ["incident_commander", "release_manager"]
+
+    - tool_id: "cicd.circleci"
+      display_name: "CI/CD"
+      tool_kind: "cicd"
+      vendor: { name: "CircleCI", product: "CircleCI" }
+      capabilities:
+        read:
+          - type: "pipelines"
+            operations: ["list_runs", "get_run", "get_run_logs"]
+          - type: "deployments"
+            operations: ["list", "get"]
+        write:
+          - type: "deployments"
+            operations: ["trigger", "rollback"]
+      connection:
+        transport: "https"
+        base_url: "${CIRCLECI_API_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "CIRCLECI_TOKEN" }
+      mappings:
+        deployment_ref:
+          canonical_format: "pipeline:{org}/{project}:{pipeline_id}"
+
+    - tool_id: "cicd.buildkite"
+      display_name: "CI/CD"
+      tool_kind: "cicd"
+      vendor: { name: "Buildkite", product: "Buildkite" }
+      capabilities:
+        read:
+          - type: "pipelines"
+            operations: ["list_runs", "get_run", "get_run_logs"]
+          - type: "deployments"
+            operations: ["list", "get"]
+        write:
+          - type: "deployments"
+            operations: ["trigger", "rollback"]
+      connection:
+        transport: "https"
+        base_url: "${BUILDKITE_API_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "BUILDKITE_TOKEN" }
+      mappings:
+        deployment_ref:
+          canonical_format: "build:{org}/{pipeline}:{build_number}"
+
+    # -------------------------
+    # Runtime / orchestration
+    # -------------------------
+    - tool_id: "runtime.kubernetes"
+      display_name: "Runtime Orchestrator"
+      tool_kind: "runtime"
+      vendor: { name: "Kubernetes", product: "Kubernetes" }
+      capabilities:
+        read:
+          - type: "workloads"
+            operations: ["list", "describe", "events", "logs"]
+          - type: "nodes"
+            operations: ["list", "describe"]
+        write:
+          - type: "workloads"
+            operations: ["scale", "restart", "rollout_status"]
+      connection:
+        transport: "sdk"
+        auth: { scheme: "mtls", token_env: "KUBECONFIG" }
+      policies:
+        action_safety:
+          requires_approval_for: ["scale", "restart"]
+          approval_roles: ["incident_commander", "oncall-primary"]
+
+    - tool_id: "runtime.docker"
+      display_name: "Container Runtime"
+      tool_kind: "runtime"
+      vendor: { name: "Docker", product: "Docker" }
+      capabilities:
+        read:
+          - type: "containers"
+            operations: ["list", "inspect", "logs"]
+      connection:
+        transport: "sdk"
+        auth: { scheme: "other", token_env: "DOCKER_CONTEXT" }
+
+    # -------------------------
+    # Cloud providers (infra context)
+    # -------------------------
+    - tool_id: "cloud.aws"
+      display_name: "Cloud Provider"
+      tool_kind: "cloud"
+      vendor: { name: "AWS", product: "AWS" }
+      capabilities:
+        read:
+          - type: "resources"
+            operations: ["list", "describe"]
+          - type: "audit"
+            operations: ["lookup_events"]
+      connection:
+        transport: "sdk"
+        auth: { scheme: "other", token_env: "AWS_PROFILE_OR_ROLE_ARN" }
+
+    - tool_id: "cloud.azure"
+      display_name: "Cloud Provider"
+      tool_kind: "cloud"
+      vendor: { name: "Azure", product: "Azure" }
+      capabilities:
+        read:
+          - type: "resources"
+            operations: ["list", "describe"]
+          - type: "audit"
+            operations: ["lookup_events"]
+      connection:
+        transport: "sdk"
+        auth: { scheme: "other", token_env: "AZURE_SUBSCRIPTION" }
+
+    - tool_id: "cloud.gcp"
+      display_name: "Cloud Provider"
+      tool_kind: "cloud"
+      vendor: { name: "GCP", product: "Google Cloud" }
+      capabilities:
+        read:
+          - type: "resources"
+            operations: ["list", "describe"]
+          - type: "audit"
+            operations: ["lookup_events"]
+      connection:
+        transport: "sdk"
+        auth: { scheme: "other", token_env: "GOOGLE_APPLICATION_CREDENTIALS" }
+
+    # -------------------------
+    # App hosting / edge
+    # -------------------------
+    - tool_id: "app_hosting.vercel"
+      display_name: "App Hosting"
+      tool_kind: "app_hosting"
+      vendor: { name: "Vercel", product: "Vercel" }
+      capabilities:
+        read:
+          - type: "deployments"
+            operations: ["list", "get", "diff"]
+          - type: "logs"
+            operations: ["search"]
+        write:
+          - type: "deployments"
+            operations: ["rollback"]
+      connection:
+        transport: "https"
+        base_url: "${VERCEL_API_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "VERCEL_TOKEN" }
+
+    - tool_id: "app_hosting.fly"
+      display_name: "App Hosting"
+      tool_kind: "app_hosting"
+      vendor: { name: "Fly.io", product: "Fly.io" }
+      capabilities:
+        read:
+          - type: "releases"
+            operations: ["list", "get"]
+          - type: "logs"
+            operations: ["search"]
+        write:
+          - type: "releases"
+            operations: ["rollback"]
+      connection:
+        transport: "https"
+        base_url: "${FLY_API_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "FLY_TOKEN" }
+
+    - tool_id: "app_hosting.railway"
+      display_name: "App Hosting"
+      tool_kind: "app_hosting"
+      vendor: { name: "Railway", product: "Railway" }
+      capabilities:
+        read:
+          - type: "deployments"
+            operations: ["list", "get"]
+          - type: "logs"
+            operations: ["search"]
+        write:
+          - type: "deployments"
+            operations: ["rollback"]
+      connection:
+        transport: "https"
+        base_url: "${RAILWAY_API_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "RAILWAY_TOKEN" }
+
+    - tool_id: "app_hosting.render"
+      display_name: "App Hosting"
+      tool_kind: "app_hosting"
+      vendor: { name: "Render", product: "Render" }
+      capabilities:
+        read:
+          - type: "deployments"
+            operations: ["list", "get"]
+          - type: "logs"
+            operations: ["search"]
+        write:
+          - type: "deployments"
+            operations: ["rollback"]
+      connection:
+        transport: "https"
+        base_url: "${RENDER_API_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "RENDER_TOKEN" }
+
+    - tool_id: "edge.cloudflare_workers"
+      display_name: "Edge Runtime"
+      tool_kind: "edge"
+      vendor: { name: "Cloudflare", product: "Cloudflare Workers" }
+      capabilities:
+        read:
+          - type: "deployments"
+            operations: ["list", "get"]
+          - type: "logs"
+            operations: ["search"]
+        write:
+          - type: "deployments"
+            operations: ["rollback"]
+      connection:
+        transport: "https"
+        base_url: "${CLOUDFLARE_API_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "CLOUDFLARE_TOKEN" }
+
+    # -------------------------
+    # IaC / change provenance
+    # -------------------------
+    - tool_id: "iac.terraform"
+      display_name: "Infrastructure as Code"
+      tool_kind: "iac"
+      vendor: { name: "Terraform", product: "Terraform" }
+      capabilities:
+        read:
+          - type: "state"
+            operations: ["read", "list_resources"]
+          - type: "plans"
+            operations: ["diff", "show"]
+      connection:
+        transport: "other"
+        auth: { scheme: "other", token_env: "TERRAFORM_BACKEND_AUTH" }
+
+    - tool_id: "iac.opentofu"
+      display_name: "Infrastructure as Code"
+      tool_kind: "iac"
+      vendor: { name: "OpenTofu", product: "OpenTofu" }
+      capabilities:
+        read:
+          - type: "state"
+            operations: ["read", "list_resources"]
+          - type: "plans"
+            operations: ["diff", "show"]
+      connection:
+        transport: "other"
+        auth: { scheme: "other", token_env: "OPENTOFU_BACKEND_AUTH" }
+
+    - tool_id: "iac.pulumi"
+      display_name: "Infrastructure as Code"
+      tool_kind: "iac"
+      vendor: { name: "Pulumi", product: "Pulumi" }
+      capabilities:
+        read:
+          - type: "stacks"
+            operations: ["list", "get", "diff"]
+      connection:
+        transport: "https"
+        base_url: "${PULUMI_API_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "PULUMI_TOKEN" }
+
+    - tool_id: "iac.aws_cdk"
+      display_name: "Infrastructure as Code"
+      tool_kind: "iac"
+      vendor: { name: "AWS", product: "AWS CDK" }
+      capabilities:
+        read:
+          - type: "changes"
+            operations: ["diff"]
+      connection:
+        transport: "other"
+        auth: { scheme: "other", token_env: "CDK_ENV_AUTH" }
+
+    # -------------------------
+    # Secrets / config provenance
+    # -------------------------
+    - tool_id: "secrets.vault"
+      display_name: "Secrets & Config"
+      tool_kind: "secrets"
+      vendor: { name: "HashiCorp", product: "Vault" }
+      capabilities:
+        read:
+          - type: "secrets_metadata"
+            operations: ["get_versions", "audit_events"]
+        write:
+          - type: "rotation"
+            operations: ["rotate", "revoke"]
+      connection:
+        transport: "https"
+        base_url: "${VAULT_ADDR}"
+        auth: { scheme: "jwt", token_env: "VAULT_TOKEN" }
+      policies:
+        data_access:
+          pii_handling: "deny"
+        action_safety:
+          requires_approval_for: ["revoke", "rotate"]
+          approval_roles: ["incident_commander", "security_oncall"]
+
+    - tool_id: "secrets.1password"
+      display_name: "Secrets & Config"
+      tool_kind: "secrets"
+      vendor: { name: "1Password", product: "1Password" }
+      capabilities:
+        read:
+          - type: "secrets_metadata"
+            operations: ["list_items", "get_item_metadata", "audit_events"]
+      connection:
+        transport: "https"
+        base_url: "${ONEPASSWORD_API_BASE_URL}"
+        auth: { scheme: "oauth2", token_env: "ONEPASSWORD_TOKEN" }
+      policies:
+        data_access:
+          pii_handling: "deny"
+
+    - tool_id: "secrets.infisical"
+      display_name: "Secrets & Config"
+      tool_kind: "secrets"
+      vendor: { name: "Infisical", product: "Infisical" }
+      capabilities:
+        read:
+          - type: "secrets_metadata"
+            operations: ["get_versions", "audit_events"]
+        write:
+          - type: "rotation"
+            operations: ["rotate", "revoke"]
+      connection:
+        transport: "https"
+        base_url: "${INFISICAL_API_BASE_URL}"
+        auth: { scheme: "api_key", token_env: "INFISICAL_TOKEN" }
+      policies:
+        data_access:
+          pii_handling: "deny"
+        action_safety:
+          requires_approval_for: ["revoke", "rotate"]
+          approval_roles: ["incident_commander", "security_oncall"]

@@ -1,0 +1,55 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv
+.env
+# Keep examples committed; ignore only real local env files.
+.env.local
+.env.*.local
+.envrc
+.python-version
+
+# Tooling and OS
+.DS_Store
+.idea/
+.vscode/
+*.log
+.codex
+.claude
+.mcp.json
+
+AGENTS.md
+CLAUDE.md
+.prompts
+ui/node_modules/
+ui/.svelte-kit/
+ui/build/
+ui/dist/
+
+# Local dev artifacts
+.playwright-cli/
+output/
+rca_agent_db/
+
+# Stray node artifacts at repo root (UI lives under ui/)
+package-lock.json
+
+# Old KB examples not used by the app (use kb/seeds or tests/fixtures)
+kb/example*.yaml
+
+# Backups created by onboarding apply
+catalog/*.before-template.*
+catalog/*.bak.*
+kb/*.before-template.*
+kb/*.bak.*

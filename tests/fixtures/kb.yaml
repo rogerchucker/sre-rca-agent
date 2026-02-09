@@ -1,0 +1,55 @@
+subjects:
+  - name: payments
+    environment: prod
+    bindings:
+      log_store: loki_main
+      vcs: vcs_main
+      deploy_tracker: deploy_main
+    log_evidence:
+      stream_selectors:
+        app: payments
+      parse:
+        format: json
+        fields:
+          env: attributes.env
+          err_msg: attributes.error.message
+          err_type: attributes.error.type
+          route: attributes.http.route
+          status: attributes.http.status
+    known_failure_modes:
+      - name: db_pool_exhaustion
+        summary: Connection pool maxed; elevated 500s.
+    runbooks:
+      - title: DB pool troubleshooting
+        link: https://example.invalid/runbooks/db-pool
+    dependencies:
+      - name: postgres
+        role: primary
+providers:
+  - id: loki_main
+    category: log_store
+    type: loki
+    config:
+      base_url_env: LOG_STORE_URL
+      auth:
+        kind: none
+  - id: vcs_main
+    category: vcs
+    type: github
+    config:
+      token_env: VCS_TOKEN
+      repo_map:
+        payments: example-org/payments
+  - id: deploy_main
+    category: deploy_tracker
+    type: github_actions
+    config:
+      token_env: DEPLOY_TOKEN
+      repo_map:
+        payments: example-org/payments
+      workflow_path_map:
+        payments: .github/workflows/deploy.yml
+      markers:
+        environment: ENV=
+        service: SERVICE=
+        sha: SHA=

@@ -1,0 +1,88 @@
+version: 1
+providers:
+  - id: log_store_1
+    category: log_store
+    type: loki
+    capabilities:
+      operations:
+        - query.signature_counts
+        - query.samples
+    config:
+      base_url_env: LOKI_URL
+      auth:
+        kind: basic_env
+        username_env: GRAFANA_USER
+        token_env: GRAFANA_TOKEN
+  - id: metrics_1
+    category: metrics_store
+    type: prometheus
+    capabilities:
+      operations:
+        - query_range
+    config:
+      base_url_env: PROMETHEUS_URL
+      auth:
+        kind: basic_env
+        username_env: GRAFANA_USER
+        token_env: GRAFANA_TOKEN
+  - id: trace_1
+    category: trace_store
+    type: jaeger
+    capabilities:
+      operations:
+        - search_traces
+    config:
+      base_url_env: TRACE_URL
+      auth:
+        kind: basic_env
+        username_env: GRAFANA_USER
+        token_env: GRAFANA_TOKEN
+  - id: alerting_1
+    category: alerting
+    type: grafana
+    capabilities:
+      operations:
+        - list_alerts
+    config:
+      base_url_env: GRAFANA_URL
+      auth:
+        kind: basic_env
+        username_env: GRAFANA_USER
+        token_env: GRAFANA_TOKEN
+      alerts_path: /api/alertmanager/grafana/api/v2/alerts
+  - id: vcs_1
+    category: vcs
+    type: github
+    capabilities:
+      operations:
+        - list_changes
+    config:
+      token_env: VCS_TOKEN
+      repo_map:
+        hn-backend-demo: rogerchucker/hn-feed
+  - id: deploy_1
+    category: deploy_tracker
+    type: github_actions
+    capabilities:
+      operations:
+        - list_deployments
+        - get_deployment_metadata
+    config:
+      token_env: DEPLOY_TOKEN
+      repo_map:
+        hn-backend-demo: rogerchucker/hn-feed
+      workflow_path_map:
+        hn-backend-demo:
+          - .github/workflows/deploy.yml
+          - .github/workflows/deploy-demo.yml
+      branch_allowlist:
+        - main
+        - demo
+      markers:
+        environment: DEPLOY_ENV=
+        service: DEPLOY_SERVICE=
+        sha: DEPLOY_SHA=
+        version: DEPLOY_VERSION=
+        image: DEPLOY_IMAGE=
+        result: DEPLOY_RESULT=
+        finished_at: DEPLOY_FINISHED_AT=

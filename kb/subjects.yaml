@@ -1,0 +1,28 @@
+version: 1
+subjects:
+  - name: service_primary
+    environment: prod
+    aliases: []
+    bindings:
+      log_store: logs_primary
+      metrics_store: metrics_primary
+      trace_store: traces_primary
+      vcs: vcs_primary
+      deploy_tracker: deploy_primary
+      alerting: alerts_primary
+    log_evidence:
+      stream_selectors: {}
+      parse:
+        format: json
+        fields:
+          env: env
+          err_msg: message
+      default_filters: {}
+      evidence_intents:
+        - signature_counts
+        - samples
+    deploy_context: {}
+    vcs_context: {}
+    known_failure_modes: []
+    dependencies: []
+    runbooks: []
