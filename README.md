@@ -1,4 +1,4 @@
-# SRE RCA Agent
+# SRE RCA Agent (WIP)
 
 Vendor-neutral SRE investigation and root cause analysis (RCA) agent with schema-backed onboarding for evidence providers (logs, metrics, traces, deploy history, VCS, alerting).
 
